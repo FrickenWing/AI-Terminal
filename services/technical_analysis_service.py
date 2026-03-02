@@ -1,38 +1,61 @@
 """
 services/technical_analysis_service.py - Technische Analyse mit Scoring
+Neu v4.0: Berechnet Indikatoren manuell mit Pandas/Numpy für höhere Zuverlässigkeit 
+und liefert die Daten für die Chart-Overlays im Frontend.
 """
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional
 from data.openbb_client import get_client
-from indicators.technical import TechnicalIndicators
-
 
 class TechnicalAnalysisService:
     def __init__(self):
         self.client = get_client()
 
     def get_price_data(self, ticker: str, period: str = "3mo", interval: str = "1d") -> pd.DataFrame:
-        """Holt Kursdaten und berechnet Indikatoren."""
-        df = self.client.get_price_history(ticker, period=period, interval=interval)
-        if df.empty:
-            return pd.DataFrame()
+        """
+        Holt Kursdaten und berechnet Indikatoren direkt (ohne externe Indicators Lib) 
+        um Inkompatibilitäten zu vermeiden. Liefert SMA, BBands und RSI.
+        """
+        df_tuple = self.client.get_price_history(ticker, period=period, interval=interval)
+        if not df_tuple: return pd.DataFrame()
+        
+        df = df_tuple[0] if isinstance(df_tuple, tuple) else df_tuple
+        if df is None or df.empty: return pd.DataFrame()
 
-        # Technische Indikatoren hinzufügen
-        ti = TechnicalIndicators(df)
-        ti.add_sma([20, 50, 200])
-        ti.add_ema([9, 21])
-        ti.add_rsi(14)
-        ti.add_macd(12, 26, 9)
-        ti.add_bollinger_bands(20, 2)
-        ti.add_atr(14)
-        ti.add_obv()
-        ti.add_volume_ma(20)
+        # SMA berechnen
+        df['sma_20'] = df['close'].rolling(window=20).mean()
+        df['sma_50'] = df['close'].rolling(window=50).mean()
+        df['sma_200'] = df['close'].rolling(window=200).mean()
 
-        return ti.df.dropna()
+        # Bollinger Bands berechnen
+        std_20 = df['close'].rolling(window=20).std()
+        df['bb_middle'] = df['sma_20']
+        df['bb_upper'] = df['sma_20'] + (std_20 * 2)
+        df['bb_lower'] = df['sma_20'] - (std_20 * 2)
+
+        # RSI berechnen
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss.replace(0, np.nan) # Div by 0 verhindern
+        df['rsi'] = 100 - (100 / (1 + rs))
+
+        # MACD Mock/Basic für Abwärtskompatibilität
+        df['macd'] = df['close'].rolling(12).mean() - df['close'].rolling(26).mean()
+        df['macd_signal'] = df['macd'].rolling(9).mean()
+        df['macd_hist'] = df['macd'] - df['macd_signal']
+
+        # Volume MA
+        df['volume_ma'] = df['volume'].rolling(20).mean()
+
+        # ATR Mock (Basic)
+        df['atr'] = (df['high'] - df['low']).rolling(14).mean()
+
+        return df.dropna()
 
     def analyze_indicators(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analysiert alle Indikatoren und erstellt ein Signal."""
+        """Originale Logik: Analysiert alle Indikatoren und erstellt ein Signal."""
         if df.empty:
             return {}
 
@@ -84,7 +107,6 @@ class TechnicalAnalysisService:
             signals['bb'] = {'value': price, 'signal': 'SELL', 'reason': 'Price above upper BB'}
             score -= 1
         else:
-            # Check if near bands
             if price > bb_middle:
                 signals['bb'] = {'value': price, 'signal': 'NEUTRAL', 'reason': 'Price in upper half of BB'}
             else:
@@ -117,7 +139,6 @@ class TechnicalAnalysisService:
             score += 1
         elif sma_50 < sma_200 and sma_20 < sma_50:
             signals['trend'] = {'value': 'DOWNTREND', 'signal': 'SELL', 'reason': 'Below SMA 200'}
-            signals['trend'] = {'value': 'DOWNTREND', 'signal': 'SELL', 'reason': 'Below SMA 200'}
             score -= 1
         else:
             signals['trend'] = {'value': 'SIDEWAYS', 'signal': 'NEUTRAL', 'reason': 'No clear trend'}
@@ -128,14 +149,13 @@ class TechnicalAnalysisService:
         vol_ma = latest.get('volume_ma', 1)
         if vol > vol_ma * 1.5:
             signals['volume'] = {'value': vol, 'signal': 'BUY', 'reason': 'High volume'}
-            score += 0.5  # Volume is secondary
+            score += 0.5
         elif vol < vol_ma * 0.5:
             signals['volume'] = {'value': vol, 'signal': 'NEUTRAL', 'reason': 'Low volume'}
         else:
             signals['volume'] = {'value': vol, 'signal': 'NEUTRAL', 'reason': 'Normal volume'}
         total_indicators += 1
 
-        # Calculate final score (-100 to +100)
         normalized_score = (score / total_indicators) * 100
 
         return {
@@ -159,7 +179,7 @@ class TechnicalAnalysisService:
         }
 
     def prepare_gemini_prompt(self, ticker: str, analysis: Dict[str, Any]) -> str:
-        """Erstellt den Prompt für Gemini."""
+        """Originale Prompt-Erstellung für Gemini beibehalten."""
         if not analysis:
             return ""
 
@@ -181,7 +201,6 @@ AKTUELLE DATEN:
 
 INDIKATOR SIGNALE:
 """
-
         for name, signal in signals.items():
             prompt += f"- {name}: {signal['signal']} - {signal['reason']}\n"
 
@@ -199,13 +218,10 @@ AUFGABE:
 
 Antworte auf Deutsch.
 """
-
         return prompt
-
 
 # --- SINGLETON PATTERN ---
 _analysis_service_instance = None
-
 
 def get_technical_analysis_service() -> TechnicalAnalysisService:
     global _analysis_service_instance

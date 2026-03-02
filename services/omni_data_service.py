@@ -2,24 +2,8 @@
 services/omni_data_service.py - Omni-Data Engine
 ══════════════════════════════════════════════════
 Aggregiert alle Datenquellen parallel (concurrent.futures) und
-gibt ein vollständiges OmniBundle zurück.
-
-Datenquellen:
-  1. Yahoo Finance  – Quote, Fundamentals
-  2. Reddit         – Mentions, Sentiment
-  3. Google Trends  – Suchinteresse
-  4. SEC EDGAR      – Insider Trades, Filings
-  5. Fear & Greed   – Marktsentiment
-  6. Macro Signals  – VIX, DXY, TNX
-  7. Earnings Cal.  – Nächster Termin + Überraschung
-  8. Analyst Ratings– Buy/Hold/Sell Konsensus
-  9. News Sentiment – Finnhub Aggregate
- 10. OpenBB         – Institutionelle News (optional)
-
-Verwendung:
-    svc    = get_omni_service()
-    bundle = svc.get_bundle("AAPL")
-    prompt = svc.build_llm_prompt(bundle)
+gibt ein vollständiges OmniBundle zurück. Beinhaltet jetzt
+auch die Multi-Agenten Logik.
 """
 
 import time
@@ -32,14 +16,10 @@ from data.trends_client    import get_trends_client
 from data.sec_client       import get_sec_client
 from data.signals_client   import get_signals_client
 from data.openbb_pat_client import get_openbb_pat_client
-
+# NEU v4.0: Technical Service Import für Agenten
+from services.technical_analysis_service import get_technical_analysis_service
 
 class OmniDataService:
-    """
-    Aggregiert alle verfügbaren Datenquellen für einen Ticker
-    und gibt einen strukturierten Bundle zurück.
-    """
-
     FETCH_TIMEOUT = 12  # Sekunden pro Quelle
 
     def __init__(self):
@@ -49,20 +29,10 @@ class OmniDataService:
         self.sec           = get_sec_client()
         self.signals       = get_signals_client()
         self.openbb        = get_openbb_pat_client()
+        self.tech          = get_technical_analysis_service()
 
-    # ── Haupt-Methode ─────────────────────────────────────────────────────────
-
+    # ── Haupt-Methode (v3.1 Original) ─────────────────────────────────────────
     def get_bundle(self, ticker: str) -> dict:
-        """
-        Holt alle Daten parallel und gibt ein vollständiges Bundle zurück.
-
-        Returns:
-            dict mit:
-              ticker, timestamp, quote, fundamentals,
-              reddit, trends, insider, filings,
-              fear_greed, macro, earnings, analyst,
-              news_sentiment, openbb_news, errors
-        """
         ticker = ticker.upper()
         bundle = {
             "ticker":    ticker,
@@ -70,7 +40,7 @@ class OmniDataService:
             "errors":    [],
         }
 
-        # Alle Fetch-Tasks definieren
+        # Tasks inklusive technischer Analyse für den neuen Technical-Agenten
         tasks = {
             "quote":          lambda: self.yf_client.get_quote(ticker),
             "news":           lambda: self.yf_client.get_news(ticker),
@@ -85,16 +55,16 @@ class OmniDataService:
             "news_sentiment": lambda: self.signals.get_news_sentiment(ticker),
             "openbb_news":    lambda: self.openbb.get_news(ticker),
             "price_target":   lambda: self.openbb.get_price_target(ticker),
+            "tech":           lambda: self.tech.analyze_indicators(self.tech.get_price_data(ticker)) # v4.0 addition
         }
 
         # Parallel ausführen
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             future_to_key = {
                 executor.submit(fn): key
                 for key, fn in tasks.items()
             }
-            for future in as_completed(future_to_key,
-                                        timeout=self.FETCH_TIMEOUT + 5):
+            for future in as_completed(future_to_key, timeout=self.FETCH_TIMEOUT + 5):
                 key = future_to_key[future]
                 try:
                     bundle[key] = future.result(timeout=self.FETCH_TIMEOUT)
@@ -107,26 +77,15 @@ class OmniDataService:
                     bundle["errors"].append(f"{key}: {str(e)[:80]}")
                     logger.warning(f"[Omni] Fehler {key}: {e}")
 
-        # Fehlende Keys mit leerem Dict füllen
         for key in tasks:
             if key not in bundle:
                 bundle[key] = {}
 
         return bundle
 
-    # ── Prompt Builder ────────────────────────────────────────────────────────
-
+    # ── Prompt Builder (v3.1 Original) ────────────────────────────────────────
     def build_llm_prompt(self, bundle: dict, analysis_focus: str = "full") -> str:
-        """
-        Baut einen strukturierten, umfassenden Prompt aus dem Bundle.
-
-        Args:
-            bundle:         Ergebnis von get_bundle()
-            analysis_focus: "full" | "sentiment" | "technical" | "fundamental"
-
-        Returns:
-            Fertiger Prompt-String für das LLM
-        """
+        """Originaler strukturierter Mega-Prompt für Legacy /api/omni/analyze"""
         t       = bundle.get("ticker","N/A")
         q       = bundle.get("quote",{})
         reddit  = bundle.get("reddit",{})
@@ -261,6 +220,71 @@ Antworte strukturiert auf Deutsch mit Markdown-Formatierung.
 Keine allgemeinen Floskeln – nur datenbasierte, spezifische Aussagen.
 """
         return prompt
+
+
+    # ── NEU v4.0: MULTI-AGENT ORCHESTRATOR ────────────────────────────────────
+    def run_multi_agent_analysis(self, bundle: dict, ai_client, model: str) -> str:
+        """
+        Orchestriert das Multi-Agenten System.
+        Startet 3 spezialisierte Agenten parallel und übergibt die Ergebnisse an den Chief Analyst.
+        """
+        t = bundle.get("ticker", "UNKNOWN")
+        
+        # --- PROMPTS FÜR DIE AGENTEN ---
+        fund_prompt = f"""Du bist der Fundamental-Agent. Bewerte die Aktie {t}.
+Daten: KGV: {bundle.get('quote',{}).get('pe_ratio')}, Analysten-Rating: {bundle.get('analyst',{}).get('recommendation')}. 
+SEC Insider Aktivität: {bundle.get('insider',{}).get('signal')} ({bundle.get('insider',{}).get('form4_count_recent')} Filings).
+Gib eine kurze, kritische fundamentale Einschätzung (2-3 Sätze)."""
+
+        tech_data = bundle.get('tech', {})
+        tech_prompt = f"""Du bist der Technical-Agent. Bewerte die Charttechnik von {t}.
+Aktueller Preis: {bundle.get('quote',{}).get('price')}.
+Tech Score: {tech_data.get('score', 0)}/100. RSI: {tech_data.get('latest_data',{}).get('rsi')}.
+Signale: {tech_data.get('buy_signals')} Buy, {tech_data.get('sell_signals')} Sell.
+Bewerte kurz den Trend und Momentum (2-3 Sätze)."""
+
+        sent_prompt = f"""Du bist der Sentiment-Agent. Bewerte die Marktstimmung zu {t}.
+Reddit Sentiment Score: {bundle.get('reddit',{}).get('sentiment')} ({bundle.get('reddit',{}).get('sentiment_label')}).
+Fear & Greed Index: {bundle.get('fear_greed',{}).get('value')} ({bundle.get('fear_greed',{}).get('label')}).
+Google Trends Richtung: {bundle.get('trends',{}).get('trend_direction')}.
+Fasse die aktuelle Hype/Fear Dynamik zusammen (2-3 Sätze)."""
+
+        # --- PARALLELE AUSFÜHRUNG DER AGENTEN ---
+        reports = {}
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            future_fund = executor.submit(ai_client.ask, fund_prompt, model)
+            future_tech = executor.submit(ai_client.ask, tech_prompt, model)
+            future_sent = executor.submit(ai_client.ask, sent_prompt, model)
+            
+            try: reports["fund"] = future_fund.result(timeout=15)
+            except Exception: reports["fund"] = "Fundamental-Analyse nicht verfügbar."
+            try: reports["tech"] = future_tech.result(timeout=15)
+            except Exception: reports["tech"] = "Technische Analyse nicht verfügbar."
+            try: reports["sent"] = future_sent.result(timeout=15)
+            except Exception: reports["sent"] = "Sentiment-Analyse nicht verfügbar."
+
+        # --- CHIEF ANALYST ---
+        meta_prompt = f"""Du bist der Chief Investment Officer (Meta-Agent). 
+Du hast soeben die Berichte deiner 3 spezialisierten Analysten für {t} erhalten:
+
+[FUNDAMENTAL REPORT]: {reports['fund']}
+[TECHNICAL REPORT]: {reports['tech']}
+[SENTIMENT REPORT]: {reports['sent']}
+
+Deine Aufgabe:
+Schreibe einen professionellen Markdown-Report für einen institutionellen Kunden.
+Struktur:
+1. **Executive Summary:** Bringe die 3 Perspektiven in einem Fazit zusammen. Sind sie einig oder widersprüchlich?
+2. **Agenten-Übersicht:** Fasse kurz die Hauptpunkte der 3 Reports in Bulletpoints zusammen.
+3. **Actionable Advice:** Klare KAUFEN, HALTEN oder VERKAUFEN Empfehlung mit strategischer Begründung.
+
+Der Tonfall ist hochprofessionell, direkt und auf Deutsch."""
+
+        try:
+            final_report = ai_client.ask(meta_prompt, model)
+            return final_report
+        except Exception as e:
+            return f"Fehler beim Chief Analyst: {e}"
 
 
 # ── Singleton ────────────────────────────────────────────────────────────────

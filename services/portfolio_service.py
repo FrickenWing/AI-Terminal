@@ -17,11 +17,12 @@ Verwendung:
 
 import pandas as pd
 import numpy as np
+
 from typing import Optional
 from loguru import logger
 
 from data.openbb_client import get_client
-from config import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
+#from config import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
 
 
 class PortfolioService:
@@ -178,6 +179,9 @@ class PortfolioService:
 
         r = returns.dropna()
         n = len(r)
+        
+        RISK_FREE_RATE = 0.041  # 4.1% Standard Risikofreier Zinssatz
+        TRADING_DAYS_PER_YEAR = 252 # Standard Handelstage pro Jahr 
 
         # Gesamtrendite
         total_return = (1 + r).prod() - 1

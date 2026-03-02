@@ -37,13 +37,13 @@
 <!-- ═══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
 <aside class="w-64 border-r border-gray-200 dark:border-white/10 flex flex-col bg-gray-50/50 dark:bg-[#0a0a0a] z-20">
     <div class="p-5">
-        <div class="flex items-center p-2.5 bg-white/40 dark:bg-white/5 rounded-xl border border-gray-200/50 dark:border-white/5">
-            <div class="flex items-center justify-center w-8 h-8 mr-3 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                <i data-lucide="trending-up" class="w-4 h-4"></i>
+        <div class="flex items-center p-2.5 bg-white/40 dark:bg-white/5 rounded-xl border border-gray-200/50 dark:border-white/5 shadow-sm">
+            <div class="flex items-center justify-center w-8 h-8 mr-3 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg">
+                <i data-lucide="orbit" class="w-5 h-5 animate-[spin_10s_linear_infinite]"></i>
             </div>
             <h1 class="text-lg font-bold tracking-tight">
-                AI<span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500 ml-0.5">-Analyst</span>
-                <span class="text-[9px] font-normal text-gray-400 ml-1">v3.1</span>
+                God<span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500 ml-0.5">Mode</span>
+                <span class="text-[9px] font-normal text-gray-400 ml-1">v4.0</span>
             </h1>
         </div>
     </div>
@@ -52,17 +52,18 @@
             <i data-lucide="activity" class="w-4 h-4"></i><span>Terminal</span>
         </button>
         <button data-tab="screener" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
-            <i data-lucide="search" class="w-4 h-4"></i><span>Sektor Screener</span>
+            <i data-lucide="filter" class="w-4 h-4"></i><span>Sektor Screener</span>
         </button>
         <button data-tab="portfolio" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
-            <i data-lucide="briefcase" class="w-4 h-4"></i><span>Portfolio</span>
+            <i data-lucide="pie-chart" class="w-4 h-4"></i><span>Risk Analytics</span>
         </button>
     </nav>
     <div class="mt-auto p-6 border-t border-gray-200 dark:border-white/10 text-xs text-gray-500 space-y-3">
         <button onclick="app.ui.openModal('patch-modal')" class="text-left hover:text-black dark:hover:text-white transition-colors flex items-center font-medium">
-            <i data-lucide="file-text" class="w-3 h-3 mr-2"></i> Patch Notes v3.1
+            <i data-lucide="file-text" class="w-3 h-3 mr-2"></i> Patch Notes v4.0
         </button>
-        <span class="opacity-75 block">Omni-Data Engine<br>10 Datenquellen parallel</span>
+        <span class="opacity-75 block text-purple-400 font-bold"><i data-lucide="bot" class="w-3 h-3 inline mr-1"></i>Multi-Agent Engine</span>
+        <span class="opacity-75 block">10+ Datenquellen parallel</span>
     </div>
 </aside>
 
@@ -90,7 +91,7 @@
     </header>
 
     <!-- Scroll Area -->
-    <div class="flex-1 overflow-y-auto p-8 no-scrollbar">
+    <div class="flex-1 overflow-y-auto p-8 no-scrollbar relative">
 
         <!-- ═══ TAB: TERMINAL ════════════════════════════════════════════════ -->
         <div id="tab-terminal" class="tab-content space-y-8">
@@ -119,10 +120,21 @@
                 <div class="xl:col-span-2 flex flex-col space-y-4 animate-slide-in">
                     <div class="flex justify-between items-end">
                         <div>
-                            <h2 id="main-chart-symbol" class="text-4xl font-bold tracking-tight">—</h2>
+                            <div class="flex items-center gap-3">
+                                <h2 id="main-chart-symbol" class="text-4xl font-bold tracking-tight">—</h2>
+                                <span id="tech-signal-badge" class="hidden text-xs font-bold px-3 py-1 rounded-full bg-blue-500/20 text-blue-500 border border-blue-500/30">Lade Signal...</span>
+                            </div>
                             <p id="main-chart-name" class="text-sm text-gray-500 mt-1">Wähle ein Asset</p>
                         </div>
-                        <div id="timeframe-controls" class="flex space-x-1 bg-gray-100 dark:bg-white/5 p-1 rounded-lg border border-gray-200 dark:border-white/5"></div>
+                        <div class="flex flex-col items-end gap-2">
+                            <!-- Technical Overlays Toggles -->
+                            <div class="flex space-x-2 text-[10px] font-bold">
+                                <button onclick="app.toggleOverlay('sma')" id="btn-ov-sma" class="px-2 py-1 rounded border border-gray-200 dark:border-white/10 text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-all">SMA 20/50</button>
+                                <button onclick="app.toggleOverlay('bb')" id="btn-ov-bb" class="px-2 py-1 rounded border border-gray-200 dark:border-white/10 text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-all">B-Bands</button>
+                            </div>
+                            <!-- Timeframes -->
+                            <div id="timeframe-controls" class="flex space-x-1 bg-gray-100 dark:bg-white/5 p-1 rounded-lg border border-gray-200 dark:border-white/5"></div>
+                        </div>
                     </div>
                     <div id="chart-container" class="h-[380px] w-full bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl relative overflow-hidden shadow-inner">
                         <div id="chart-loading" class="absolute inset-0 flex-col items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm z-10 hidden">
@@ -136,8 +148,8 @@
                             <button onclick="app.omni.openRawPanel()" class="flex items-center px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-semibold text-sm transition-all hover:scale-105">
                                 <i data-lucide="database" class="w-4 h-4 mr-2"></i> Rohdaten
                             </button>
-                            <button onclick="app.reports.openModal()" class="flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl shadow-lg font-semibold text-sm transition-all hover:scale-105">
-                                <i data-lucide="brain-circuit" class="w-4 h-4 mr-2"></i> KI Analyse
+                            <button onclick="app.reports.openModal()" class="flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.5)] font-bold text-sm transition-all hover:scale-105">
+                                <i data-lucide="network" class="w-4 h-4 mr-2"></i> Multi-Agent Analyse
                             </button>
                         </div>
                     </div>
@@ -146,15 +158,18 @@
                 <!-- Chat -->
                 <div class="flex flex-col h-[480px] bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-sm animate-slide-in" style="animation-delay:0.1s">
                     <div class="p-4 border-b border-gray-100 dark:border-white/10 flex items-center bg-gray-50/50 dark:bg-transparent">
-                        <i data-lucide="message-square-text" class="w-4 h-4 mr-2 text-blue-500"></i>
-                        <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Analyst Chat</span>
+                        <div class="relative">
+                            <i data-lucide="bot" class="w-5 h-5 mr-3 text-purple-500"></i>
+                            <span class="absolute bottom-0 right-2 w-2 h-2 bg-green-500 rounded-full border-2 border-white dark:border-[#111]"></span>
+                        </div>
+                        <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Terminal Assistant</span>
                     </div>
                     <div id="chat-output" class="flex-1 overflow-y-auto p-5 space-y-4 text-sm sleek-scroll">
-                        <div class="text-center text-gray-400 text-xs mt-10">Stelle dem KI-Analysten Fragen zur aktuellen Aktie.</div>
+                        <div class="text-center text-gray-400 text-xs mt-10">Stelle dem KI-Analysten Fragen zur aktuellen Aktie oder zum Markt.</div>
                     </div>
                     <div class="p-4 border-t border-gray-100 dark:border-white/10">
-                        <input id="chat-input" type="text" placeholder="Frage senden (Enter)..."
-                            class="w-full bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:text-white">
+                        <input id="chat-input" type="text" placeholder="Prompt eingeben (Enter)..."
+                            class="w-full bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 dark:text-white transition-all shadow-inner">
                     </div>
                 </div>
             </div>
@@ -287,71 +302,194 @@
             </div>
         </div>
 
-        <!-- TAB: SCREENER -->
-        <div id="tab-screener" class="tab-content hidden h-full flex flex-col items-center justify-center text-center animate-fade-in">
-            <i data-lucide="telescope" class="w-16 h-16 text-blue-500/50 mb-6"></i>
-            <h2 class="text-3xl font-bold mb-3">Sektor Screener</h2>
-            <p class="text-gray-500 max-w-md">Dieses Modul nutzt Finnhub & Yahoo API um Top-Performer zu finden.</p>
+        <!-- ═══ TAB: SCREENER ════════════════════════════════════════════════ -->
+        <div id="tab-screener" class="tab-content hidden h-full flex flex-col animate-fade-in">
+            <div class="flex items-center mb-6">
+                <i data-lucide="filter" class="w-8 h-8 text-blue-500 mr-4"></i>
+                <div>
+                    <h2 class="text-3xl font-bold">Finnhub Sektor Screener</h2>
+                    <p class="text-gray-500 text-sm">Finde Momentum-Aktien und Value-Plays auf Basis harter Metriken.</p>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-5 mb-6 flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Universum</label>
+                    <select id="screen-universe" class="bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                        <option value="mega_cap_us">US Mega Caps</option>
+                        <option value="dax_40">DAX 40</option>
+                        <option value="tech_growth">Tech Growth</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Max P/E (KGV)</label>
+                    <input type="number" id="screen-pe" placeholder="z.B. 30" class="w-24 bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Min. RSI (Momentum)</label>
+                    <input type="number" id="screen-rsi" placeholder="z.B. 40" class="w-24 bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button onclick="app.runScreener()" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors flex items-center shadow-lg">
+                    <i data-lucide="search" class="w-4 h-4 mr-2"></i> Screenen
+                </button>
+            </div>
+
+            <div class="flex-1 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-inner relative">
+                <div id="screener-loading" class="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-10 hidden flex-col items-center justify-center">
+                    <i data-lucide="loader" class="w-8 h-8 text-blue-500 animate-spin mb-2"></i>
+                    <span class="text-xs font-bold">Analysiere Finnhub Daten...</span>
+                </div>
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-50 dark:bg-white/5 text-gray-500 text-xs uppercase font-bold">
+                        <tr>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">Ticker</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">Preis</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">Trend</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">P/E Ratio</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">Tech Score</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10 text-right">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="screener-results" class="divide-y divide-gray-100 dark:divide-white/5">
+                        <tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">Wähle Filter und starte den Screener.</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- TAB: PORTFOLIO -->
-        <div id="tab-portfolio" class="tab-content hidden h-full flex flex-col items-center justify-center text-center animate-fade-in">
-            <i data-lucide="briefcase" class="w-16 h-16 text-purple-500/50 mb-6"></i>
-            <h2 class="text-3xl font-bold mb-3">Portfolio Manager</h2>
-            <p class="text-gray-500">Verwalte deine Positionen modular.</p>
+        <!-- ═══ TAB: PORTFOLIO ═══════════════════════════════════════════════ -->
+        <div id="tab-portfolio" class="tab-content hidden h-full flex flex-col animate-fade-in">
+            <div class="flex justify-between items-end mb-6">
+                <div class="flex items-center">
+                    <i data-lucide="pie-chart" class="w-8 h-8 text-purple-500 mr-4"></i>
+                    <div>
+                        <h2 class="text-3xl font-bold">Risk & Portfolio Analytics</h2>
+                        <p class="text-gray-500 text-sm">Professionelle Risikobewertung (Sharpe, Drawdown, VaR).</p>
+                    </div>
+                </div>
+                <button onclick="app.portfolio.addMockPosition()" class="text-xs text-purple-500 font-bold hover:underline">Mock-Daten laden</button>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6" id="portfolio-stats">
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Total Return</div><div class="text-xl font-black">—</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Sharpe Ratio</div><div class="text-xl font-black">—</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Max Drawdown</div><div class="text-xl font-black">—</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Value at Risk (95%)</div><div class="text-xl font-black">—</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">vs S&P 500</div><div class="text-xl font-black">—</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-[400px]">
+                <!-- Positionen -->
+                <div class="lg:col-span-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl flex flex-col overflow-hidden">
+                    <div class="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-[#0a0a0a] flex justify-between items-center">
+                        <span class="font-bold text-sm">Deine Positionen</span>
+                        <div class="flex gap-2">
+                            <input type="text" id="port-ticker" placeholder="Ticker" class="w-20 text-xs px-2 py-1 rounded border dark:bg-black dark:border-white/20">
+                            <input type="number" id="port-qty" placeholder="Anzahl" class="w-20 text-xs px-2 py-1 rounded border dark:bg-black dark:border-white/20">
+                            <button onclick="app.portfolio.addPosition()" class="bg-purple-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-purple-500">+</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-4 sleek-scroll">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-xs text-gray-500"><tr><th>Ticker</th><th>Shares</th><th>Aktion</th></tr></thead>
+                            <tbody id="portfolio-positions-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 dark:border-white/10">
+                        <button onclick="app.portfolio.analyze()" class="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg transition-all flex justify-center items-center">
+                            <i data-lucide="activity" class="w-4 h-4 mr-2"></i> Portfolio analysieren
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sektor Allokation -->
+                <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-5 flex flex-col">
+                    <h3 class="font-bold text-sm mb-4 border-b border-gray-100 dark:border-white/10 pb-2">Sektor Allokation</h3>
+                    <div id="portfolio-sectors" class="space-y-4 flex-1">
+                        <div class="text-gray-500 text-xs text-center mt-10">Keine Daten berechnet.</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </main>
 
-<!-- ═══ MODAL: KI ANALYSE ═══════════════════════════════════════════════════ -->
-<div id="report-modal" class="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] hidden items-center justify-center opacity-0 transition-opacity">
+<!-- ═══ MODAL: MULTI-AGENT KI ANALYSE ══════════════════════════════════════ -->
+<div id="report-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] hidden items-center justify-center opacity-0 transition-opacity">
     <div class="modal-inner bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl scale-95 transition-all duration-300">
-        <div class="p-6 border-b border-gray-200 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5 rounded-t-2xl">
-            <div>
-                <h2 class="text-2xl font-bold flex items-center">
-                    <i data-lucide="brain-circuit" class="mr-3 text-blue-500"></i>
-                    Omni-Analyse: <span id="report-symbol-title" class="ml-2 text-blue-500"></span>
+        <div class="p-6 border-b border-gray-200 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5 rounded-t-2xl relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-50"></div>
+            <div class="relative z-10">
+                <h2 class="text-2xl font-black flex items-center">
+                    <i data-lucide="network" class="mr-3 text-blue-500"></i>
+                    Multi-Agent Intelligence
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Powered by 10 Datenquellen + LLM-Analyse</p>
+                <p class="text-sm text-gray-500 mt-1 font-mono" id="report-symbol-title">Warte auf Target...</p>
             </div>
-            <button onclick="app.reports.closeModal()" class="p-2 bg-gray-200 dark:bg-white/10 rounded-full hover:bg-red-500 hover:text-white transition-colors text-gray-500">
+            <button onclick="app.reports.closeModal()" class="relative z-10 p-2 bg-gray-200 dark:bg-white/10 rounded-full hover:bg-red-500 hover:text-white transition-colors text-gray-500">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
         <div class="p-4 border-b border-gray-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-4" id="report-controls">
             <div class="flex flex-wrap items-center gap-4">
                 <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-600 dark:text-gray-400">KI Engine:</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Modell:</span>
                     <select id="report-model-select" class="bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm dark:text-white focus:ring-2 focus:ring-blue-500">
-                        <option value="mistralai/Mistral-7B-Instruct-v0.3">Mistral 7B (Empfohlen)</option>
+                        <option value="mistralai/Mistral-7B-Instruct-v0.3">Mistral 7B (Fast)</option>
                         <option value="HuggingFaceH4/zephyr-7b-beta">Zephyr 7B</option>
-                        <option value="microsoft/Phi-3-mini-4k-instruct">Phi-3 Mini</option>
-                        <option value="meta-llama/Llama-3.2-3B-Instruct">LLaMA 3.2 3B</option>
-                    </select>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-600 dark:text-gray-400">Fokus:</span>
-                    <select id="report-focus-select" class="bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm dark:text-white focus:ring-2 focus:ring-blue-500">
-                        <option value="full">🔭 Full Omni-Analyse</option>
-                        <option value="sentiment">💬 Sentiment-Fokus</option>
-                        <option value="fundamental">📊 Fundamental-Fokus</option>
                     </select>
                 </div>
             </div>
-            <button onclick="app.reports.generate()" class="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-lg transition-colors flex items-center">
-                <i data-lucide="zap" class="w-4 h-4 mr-2"></i> Analyse starten
+            <button onclick="app.reports.generate()" class="px-8 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all hover:scale-105 shadow-[0_0_15px_rgba(168,85,247,0.4)] flex items-center">
+                <i data-lucide="zap" class="w-4 h-4 mr-2"></i> Agenten starten
             </button>
         </div>
         <div class="flex-1 overflow-y-auto p-8 relative sleek-scroll">
-            <div id="report-loading" class="hidden flex-col items-center justify-center h-full space-y-4">
-                <div class="relative w-16 h-16">
-                    <div class="absolute inset-0 border-4 border-gray-200 dark:border-white/10 rounded-full"></div>
-                    <div class="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+            
+            <!-- Agent Progress Matrix -->
+            <div id="report-loading" class="hidden flex-col items-center justify-center h-full space-y-8 w-full max-w-2xl mx-auto">
+                <h3 class="font-black text-xl mb-4 text-center w-full">Initialisiere Agenten-Netzwerk...</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                    <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10 text-center relative overflow-hidden">
+                        <div id="agent-fund-loader" class="absolute bottom-0 left-0 h-1 bg-blue-500 w-0 transition-all duration-1000"></div>
+                        <i data-lucide="building-2" class="w-8 h-8 text-blue-500 mx-auto mb-2"></i>
+                        <div class="text-xs font-bold uppercase">Fundamental Agent</div>
+                        <div id="agent-fund-status" class="text-[10px] text-gray-500 mt-1">Liest SEC Filings...</div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10 text-center relative overflow-hidden">
+                        <div id="agent-tech-loader" class="absolute bottom-0 left-0 h-1 bg-orange-500 w-0 transition-all duration-1000"></div>
+                        <i data-lucide="line-chart" class="w-8 h-8 text-orange-500 mx-auto mb-2"></i>
+                        <div class="text-xs font-bold uppercase">Technical Agent</div>
+                        <div id="agent-tech-status" class="text-[10px] text-gray-500 mt-1">Analysiert Indikatoren...</div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10 text-center relative overflow-hidden">
+                        <div id="agent-sent-loader" class="absolute bottom-0 left-0 h-1 bg-green-500 w-0 transition-all duration-1000"></div>
+                        <i data-lucide="messages-square" class="w-8 h-8 text-green-500 mx-auto mb-2"></i>
+                        <div class="text-xs font-bold uppercase">Sentiment Agent</div>
+                        <div id="agent-sent-status" class="text-[10px] text-gray-500 mt-1">Scrapt r/wallstreetbets...</div>
+                    </div>
                 </div>
-                <p class="text-lg font-medium text-gray-700 dark:text-gray-300">Analysiere Omni-Data Streams...</p>
-                <p class="text-sm text-gray-400">Reddit · Google Trends · SEC · Fear&Greed · Makro · Earnings · Analyst</p>
+                <div class="w-full flex items-center justify-center mt-6 opacity-50" id="chief-agent-box">
+                    <i data-lucide="brain-circuit" class="w-10 h-10 text-purple-500 mr-4 animate-pulse"></i>
+                    <div>
+                        <div class="text-sm font-bold">Chief Analyst</div>
+                        <div class="text-xs text-gray-500">Wartet auf Agenten-Reports...</div>
+                    </div>
+                </div>
             </div>
-            <div id="report-result" class="prose dark:prose-invert max-w-none hidden text-gray-800 dark:text-gray-300"></div>
+
+            <div id="report-result" class="prose dark:prose-invert max-w-none hidden text-gray-800 dark:text-gray-300 mx-auto"></div>
         </div>
     </div>
 </div>
@@ -382,21 +520,17 @@
     <div class="modal-inner bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 p-8 rounded-3xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[80vh] scale-95 transition-all duration-300">
         <h2 class="text-2xl font-bold mb-6 shrink-0 flex items-center justify-between">
             <span>System Update</span>
-            <span class="text-xs font-bold bg-purple-500 text-white px-3 py-1 rounded-full">v3.1 Omni-Data</span>
+            <span class="text-xs font-bold bg-purple-500 text-white px-3 py-1 rounded-full">God-Mode v4.0</span>
         </h2>
         <div class="space-y-6 text-sm text-gray-600 dark:text-gray-400 overflow-y-auto sleek-scroll pr-2 flex-1">
             <div>
-                <h3 class="text-black dark:text-white font-bold mb-3 text-base">v3.1 – Omni-Data Engine</h3>
+                <h3 class="text-black dark:text-white font-bold mb-3 text-base">v4.0 – God-Mode & Multi-Agent Engine</h3>
                 <ul class="space-y-2">
-                    <li>• 🔴 <strong>Reddit Sentiment</strong> – r/wallstreetbets, r/stocks, r/investing, r/options werden automatisch nach Mentions gescannt. Bullish/Bearish-Ratio + Top Posts.</li>
-                    <li>• 📈 <strong>Google Trends</strong> – Suchinteresse-Sparkline (90 Tage), Peak-Detection, Trend-Richtung.</li>
-                    <li>• 🏛️ <strong>SEC EDGAR</strong> – Insider Trading (Form 4) und aktuelle Filings (8-K, 10-K, 10-Q) direkt aus dem EDGAR-System.</li>
-                    <li>• 😱 <strong>Fear &amp; Greed Index</strong> – CNN Market Sentiment + Makro-Daten (VIX, DXY, TNX) als Live-Gauge.</li>
-                    <li>• 📅 <strong>Earnings &amp; Analyst</strong> – Nächster Termin, EPS-Surprise, Buy/Hold/Sell-Konsensus, Kursziel-Range.</li>
-                    <li>• 📰 <strong>News Sentiment</strong> – Aggregierter Finnhub Sentiment-Score mit Bullish/Bearish-Balance.</li>
-                    <li>• 🧠 <strong>LLM Prompt Builder</strong> – Alle 10 Quellen werden zu einem strukturierten, 2000+ Zeichen Prompt zusammengebaut und ans LLM übergeben.</li>
-                    <li>• ⚡ <strong>Parallel Loading</strong> – Alle Quellen werden mit ThreadPoolExecutor gleichzeitig geladen (8 Threads). Kein Warten mehr.</li>
-                    <li>• 💾 <strong>Smart Cache</strong> – Bundle: 10 Min | Trends: 1h | SEC: 1h | Globale Signale: 5 Min.</li>
+                    <li>• 🧠 <strong>Multi-Agent KI</strong> – 3 Sub-Agenten analysieren Fundamentals, Technik und Sentiment. Ein "Chief Analyst" orchestriert den finalen Report.</li>
+                    <li>• 📊 <strong>Chart Overlays</strong> – SMA 20/50 und Bollinger Bänder per Knopfdruck live in den Chart laden (Berechnet aus dem Backend).</li>
+                    <li>• 🔭 <strong>Finnhub Sektor Screener</strong> – Filter ganze Universen (DAX, Tech, Mega Caps) nach KGV und technischem Momentum (RSI).</li>
+                    <li>• 💼 <strong>Portfolio Analytics</strong> – Berechne echte Risikometriken (Sharpe Ratio, Value at Risk, Max Drawdown) und Sektor-Allokation für deine Positionen.</li>
+                    <li>• 🌐 <strong>Omni-Dashboard</strong> – Alle 10 Datenquellen (Reddit, Trends, Fear & Greed, SEC Insider) sind weiterhin parallel aktiv im Terminal!</li>
                 </ul>
             </div>
         </div>
@@ -414,6 +548,7 @@ class DataService {
     async _post(url, body)    { return (await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json(); }
 
     fetchChart(sym, period)   { return this._get(`/api/chart/${sym}?period=${period}`); }
+    fetchTechnical(sym)       { return this._get(`/api/technical/${sym}`); }
     fetchStockSummary(sym)    { return this._get(`/api/stock/${sym}`); }
     fetchFundamentals(sym)    { return this._get(`/api/fmp/${sym}`); }
     fetchNews(sym)            { return this._get(`/api/news/${sym}`); }
@@ -422,7 +557,11 @@ class DataService {
     fetchOmniBundle(sym)      { return this._get(`/api/omni/${sym}`); }
     search(q)                 { return this._get(`/api/search?q=${encodeURIComponent(q)}`); }
     chat(sym, msg)            { return this._post('/api/chat',{symbol:sym,message:msg}); }
-    omniAnalyze(sym, model, focus) { return this._post('/api/omni/analyze',{symbol:sym,model,focus}); }
+    
+    // God-Mode Endpoints
+    omniMultiAgentAnalyze(sym, model) { return this._post('/api/omni/multi-agent',{symbol:sym,model}); }
+    runScreener(universe, pe, rsi)    { return this._post('/api/screener',{universe, filters:{pe_max:pe, rsi_min:rsi}}); }
+    analyzePortfolio(positions)       { return this._post('/api/portfolio/analyze',{positions}); }
 
     modifyWatchlist(action, sym, name='') {
         const opt = {method:action==='ADD'?'POST':'DELETE',headers:{'Content-Type':'application/json'}};
@@ -437,7 +576,8 @@ class DataService {
 class ChartController {
     constructor(id) {
         this.container = document.getElementById(id);
-        this.chart = null; this.series = null;
+        this.chart = null; this.series = null; 
+        this.overlays = {}; this.overlayData = null;
         this._init();
     }
     _init() {
@@ -455,6 +595,7 @@ class ChartController {
     }
     draw(data) {
         if(this.series) this.chart.removeSeries(this.series);
+        this._clearOverlays();
         if(!data||!data.length) return;
         const isPos = (data[data.length-1].value||0) >= (data[0].value||0);
         this.series = this.chart.addAreaSeries({
@@ -465,6 +606,41 @@ class ChartController {
         });
         this.series.setData(data.map(d=>({time:d.time,value:d.value||d.close})));
         this.chart.timeScale().fitContent();
+    }
+    setOverlayData(data) { this.overlayData = data; }
+    _clearOverlays() {
+        for(let key in this.overlays) { this.chart.removeSeries(this.overlays[key]); delete this.overlays[key]; }
+    }
+    toggleOverlay(type) {
+        if(!this.overlayData) return;
+        if(type === 'sma') {
+            if(this.overlays['sma20']) {
+                this.chart.removeSeries(this.overlays['sma20']); delete this.overlays['sma20'];
+                this.chart.removeSeries(this.overlays['sma50']); delete this.overlays['sma50'];
+                document.getElementById('btn-ov-sma').classList.remove('bg-blue-500/20','text-blue-500','border-blue-500/50');
+            } else {
+                const s20 = this.chart.addLineSeries({color:'#3b82f6', lineWidth:2});
+                const s50 = this.chart.addLineSeries({color:'#f97316', lineWidth:2});
+                s20.setData(this.overlayData.map(d=>({time:d.time, value:d.sma_20})).filter(d=>d.value));
+                s50.setData(this.overlayData.map(d=>({time:d.time, value:d.sma_50})).filter(d=>d.value));
+                this.overlays['sma20'] = s20; this.overlays['sma50'] = s50;
+                document.getElementById('btn-ov-sma').classList.add('bg-blue-500/20','text-blue-500','border-blue-500/50');
+            }
+        }
+        if(type === 'bb') {
+            if(this.overlays['bbu']) {
+                this.chart.removeSeries(this.overlays['bbu']); delete this.overlays['bbu'];
+                this.chart.removeSeries(this.overlays['bbl']); delete this.overlays['bbl'];
+                document.getElementById('btn-ov-bb').classList.remove('bg-blue-500/20','text-blue-500','border-blue-500/50');
+            } else {
+                const bbu = this.chart.addLineSeries({color:'rgba(156, 163, 175, 0.5)', lineWidth:1, lineStyle: 2});
+                const bbl = this.chart.addLineSeries({color:'rgba(156, 163, 175, 0.5)', lineWidth:1, lineStyle: 2});
+                bbu.setData(this.overlayData.map(d=>({time:d.time, value:d.bb_upper})).filter(d=>d.value));
+                bbl.setData(this.overlayData.map(d=>({time:d.time, value:d.bb_lower})).filter(d=>d.value));
+                this.overlays['bbu'] = bbu; this.overlays['bbl'] = bbl;
+                document.getElementById('btn-ov-bb').classList.add('bg-blue-500/20','text-blue-500','border-blue-500/50');
+            }
+        }
     }
     showLoading(v) { document.getElementById('chart-loading').style.display = v?'flex':'none'; }
 }
@@ -660,115 +836,130 @@ class OmniController {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// 4. AI / REPORT CONTROLLER
-// ────────────────────────────────────────────────────────────────────────────
-class AIController {
-    constructor(api) { this.api = api; this._setupChat(); }
-
-    _setupChat() {
-        document.getElementById('chat-input').addEventListener('keypress', async e => {
-            if(e.key!=='Enter'||!app.state.symbol||!e.target.value.trim()) return;
-            const msg = e.target.value.trim(); e.target.value = '';
-            this._appendMsg(msg,'user');
-            const lid = this._appendLoading();
-            try {
-                const res = await this.api.chat(app.state.symbol, msg);
-                document.getElementById(lid).remove();
-                this._appendMsg(marked.parse(res.reply),'ai',res.reply.toLowerCase().includes('fehler'));
-            } catch(err) {
-                document.getElementById(lid).remove();
-                this._appendMsg('Verbindungsfehler zur KI.','ai',true);
-            }
-        });
-    }
-
-    _appendMsg(html, type, isErr=false) {
-        const out = document.getElementById('chat-output');
-        const d   = document.createElement('div');
-        d.className = `flex mt-3 animate-fade-in ${type==='user'?'justify-end':'justify-start'}`;
-        const ic = type==='user'
-            ? 'bg-blue-600 text-white text-xs px-4 py-2.5 rounded-2xl rounded-tr-none max-w-[85%]'
-            : isErr
-                ? 'bg-red-500/20 text-red-500 border border-red-500/30 text-xs px-4 py-3 rounded-2xl rounded-tl-none max-w-[95%]'
-                : 'bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-gray-200 text-xs px-4 py-3 rounded-2xl rounded-tl-none max-w-[95%] leading-relaxed border border-gray-200 dark:border-white/5';
-        d.innerHTML = `<div class="${ic}">${html}</div>`;
-        out.appendChild(d); out.scrollTop = out.scrollHeight;
-    }
-
-    _appendLoading() {
-        const id  = 'load-'+Date.now();
-        const out = document.getElementById('chat-output');
-        out.innerHTML += `<div id="${id}" class="flex justify-start mt-3"><div class="bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/5 px-4 py-2 rounded-2xl rounded-tl-none"><i data-lucide="loader" class="w-4 h-4 animate-spin text-blue-500"></i></div></div>`;
-        lucide.createIcons(); out.scrollTop = out.scrollHeight;
-        return id;
-    }
-
-    openModal() {
-        if(!app.state.symbol) return alert('Wähle eine Aktie aus!');
-        document.getElementById('report-symbol-title').innerText = app.state.symbol;
-        document.getElementById('report-result').classList.add('hidden');
-        document.getElementById('report-controls').classList.remove('hidden');
-        app.ui.openModal('report-modal');
-    }
-
-    closeModal() { app.ui.closeModal('report-modal'); }
-
-    async generate() {
-        document.getElementById('report-controls').classList.add('hidden');
-        const rl = document.getElementById('report-loading');
-        rl.classList.remove('hidden'); rl.classList.add('flex');
-        document.getElementById('report-result').classList.add('hidden');
-
-        const model = document.getElementById('report-model-select').value;
-        const focus = document.getElementById('report-focus-select').value;
-        try {
-            const data = await this.api.omniAnalyze(app.state.symbol, model, focus);
-            rl.classList.add('hidden'); rl.classList.remove('flex');
-            const resultEl = document.getElementById('report-result');
-            resultEl.innerHTML = marked.parse(data.report||'Kein Ergebnis.');
-            resultEl.classList.remove('hidden');
-        } catch(e) {
-            rl.classList.add('hidden'); rl.classList.remove('flex');
-            const resultEl = document.getElementById('report-result');
-            resultEl.innerHTML = `<p class="text-red-500">Fehler: ${e.message}</p>`;
-            resultEl.classList.remove('hidden');
-        }
-    }
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// 5. APPLICATION ORCHESTRATOR
+// 4. APPLICATION ORCHESTRATOR
 // ────────────────────────────────────────────────────────────────────────────
 class Application {
     constructor() {
         this.api     = new DataService();
         this.chartUI = new ChartController('chart-container');
-        this.reports = new AIController(this.api);
         this.omni    = new OmniController(this.api);
         this.state   = { symbol: null, name: null, period: '1y', lastFetch: 0 };
+        this.positions = [];
 
         this.ui = {
             openModal: (id) => {
-                const m = document.getElementById(id);
-                m.classList.remove('hidden'); m.classList.add('flex');
-                setTimeout(() => {
-                    m.classList.remove('opacity-0');
-                    const inner = m.querySelector('.modal-inner');
-                    if(inner) inner.classList.remove('scale-95');
-                }, 10);
+                const m = document.getElementById(id); m.classList.remove('hidden'); m.classList.add('flex');
+                setTimeout(() => { m.classList.remove('opacity-0'); m.querySelector('.modal-inner')?.classList.remove('scale-95'); }, 10);
             },
             closeModal: (id) => {
-                const m = document.getElementById(id);
-                m.classList.add('opacity-0');
-                const inner = m.querySelector('.modal-inner');
-                if(inner) inner.classList.add('scale-95');
+                const m = document.getElementById(id); m.classList.add('opacity-0'); m.querySelector('.modal-inner')?.classList.add('scale-95');
                 setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
             },
+        };
+
+        this.reports = {
+            openModal: () => {
+                if(!this.state.symbol) return alert('Wähle eine Aktie aus!');
+                document.getElementById('report-symbol-title').innerText = `Target: ${this.state.symbol} | Protocol: Multi-Agent Omni`;
+                document.getElementById('report-result').classList.add('hidden');
+                document.getElementById('report-controls').classList.remove('hidden');
+                this.ui.openModal('report-modal');
+            },
+            closeModal: () => this.ui.closeModal('report-modal'),
+            generate: async () => {
+                document.getElementById('report-controls').classList.add('hidden');
+                const rl = document.getElementById('report-loading');
+                rl.classList.remove('hidden'); rl.classList.add('flex');
+                
+                // Fancy Animation für die Agenten
+                const agents = ['fund', 'tech', 'sent'];
+                agents.forEach((a, i) => {
+                    setTimeout(() => {
+                        document.getElementById(`agent-${a}-loader`).style.width = '100%';
+                        document.getElementById(`agent-${a}-status`).innerText = 'Report generiert ✓';
+                        document.getElementById(`agent-${a}-status`).classList.add('text-green-500');
+                    }, 1000 + (i*800));
+                });
+                setTimeout(() => document.getElementById('chief-agent-box').classList.remove('opacity-50'), 3500);
+
+                try {
+                    const model = document.getElementById('report-model-select').value;
+                    const data = await this.api.omniMultiAgentAnalyze(this.state.symbol, model);
+                    
+                    rl.classList.add('hidden'); rl.classList.remove('flex');
+                    const resultEl = document.getElementById('report-result');
+                    resultEl.innerHTML = marked.parse(data.report||'Kein Ergebnis.');
+                    resultEl.classList.remove('hidden');
+                    
+                    // Reset Animations
+                    agents.forEach(a => {
+                        document.getElementById(`agent-${a}-loader`).style.width = '0%';
+                        document.getElementById(`agent-${a}-status`).innerText = 'Warte...';
+                        document.getElementById(`agent-${a}-status`).classList.remove('text-green-500');
+                    });
+                } catch(e) {
+                    rl.innerHTML = `<p class="text-red-500 font-bold">System Error: ${e.message}</p>`;
+                }
+            }
+        };
+
+        this.portfolio = {
+            addPosition: () => {
+                const sym = document.getElementById('port-ticker').value.toUpperCase();
+                const qty = parseFloat(document.getElementById('port-qty').value);
+                if(!sym || !qty) return;
+                this.positions.push({ticker: sym, qty: qty, buy_price: 100}); // Buy price mock für UI simplify
+                this.portfolio.renderList();
+                document.getElementById('port-ticker').value = ''; document.getElementById('port-qty').value = '';
+            },
+            removePosition: (idx) => { this.positions.splice(idx,1); this.portfolio.renderList(); },
+            renderList: () => {
+                document.getElementById('portfolio-positions-body').innerHTML = this.positions.map((p,i) => `
+                    <tr class="border-b border-gray-100 dark:border-white/5"><td class="py-2 font-bold">${p.ticker}</td><td>${p.qty}</td>
+                    <td><button onclick="app.portfolio.removePosition(${i})" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="w-4 h-4"></i></button></td></tr>`).join('');
+                lucide.createIcons();
+            },
+            addMockPosition: () => {
+                this.positions = [{ticker:"AAPL",qty:10,buy_price:150},{ticker:"MSFT",qty:5,buy_price:300},{ticker:"NVDA",qty:20,buy_price:400}];
+                this.portfolio.renderList();
+                this.portfolio.analyze();
+            },
+            analyze: async () => {
+                if(!this.positions.length) return alert('Füge zuerst Positionen hinzu.');
+                try {
+                    const res = await this.api.analyzePortfolio(this.positions);
+                    if(!res.metrics) return alert('Konnte Portfolio nicht analysieren.');
+                    const m = res.metrics;
+                    document.getElementById('portfolio-stats').innerHTML = `
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Total Return</div>
+                            <div class="text-xl font-black ${m.total_return>=0?'text-green-500':'text-red-500'}">${(m.total_return*100).toFixed(2)}%</div></div>
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Sharpe Ratio</div>
+                            <div class="text-xl font-black text-blue-500">${m.sharpe_ratio.toFixed(2)}</div></div>
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Max Drawdown</div>
+                            <div class="text-xl font-black text-red-500">${(m.max_drawdown*100).toFixed(2)}%</div></div>
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Value at Risk (95%)</div>
+                            <div class="text-xl font-black text-orange-500">${(m.var_95*100).toFixed(2)}%</div></div>
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Alpha vs S&P500</div>
+                            <div class="text-xl font-black ${res.benchmark.alpha>=0?'text-green-500':'text-red-500'}">${(res.benchmark.alpha*100).toFixed(2)}%</div></div>`;
+                    
+                    document.getElementById('portfolio-sectors').innerHTML = res.sector_alloc.map(s => `
+                        <div>
+                            <div class="flex justify-between text-xs font-bold mb-1"><span>${s.sector}</span><span>${(s.weight*100).toFixed(1)}%</span></div>
+                            <div class="w-full bg-gray-200 dark:bg-white/10 rounded-full h-2"><div class="bg-purple-500 h-2 rounded-full" style="width: ${s.weight*100}%"></div></div>
+                        </div>`).join('');
+                } catch(e) { alert('Fehler bei der Analyse.'); }
+            }
         };
 
         this._initUI();
         this._renderTimeframes();
         this._setupSearch();
+        this._setupChat();
         setInterval(() => this._updateStatus(), 10000);
         this.loadWatchlist();
         this._loadGlobalSignals();
@@ -793,9 +984,7 @@ class Application {
                 const tab = e.currentTarget.getAttribute('data-tab');
                 document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
                 document.getElementById(`tab-${tab}`).classList.remove('hidden');
-                document.querySelectorAll('.nav-btn').forEach(el => {
-                    el.className = 'nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors';
-                });
+                document.querySelectorAll('.nav-btn').forEach(el => { el.className = 'nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors'; });
                 e.currentTarget.className = 'nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-black dark:text-white font-semibold transition-colors';
             });
         });
@@ -804,16 +993,15 @@ class Application {
     _renderTimeframes() {
         const tf = ['1d','5d','1mo','6mo','1y','5y','max'];
         document.getElementById('timeframe-controls').innerHTML = tf.map(t =>
-            `<button onclick="app.setPeriod('${t}')" id="btn-tf-${t}" class="tf-btn px-3 py-1.5 rounded text-xs font-medium transition-all ${t==='1y'?'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm':'text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5'}">${t.toUpperCase()}</button>`
+            `<button onclick="app.setPeriod('${t}')" id="btn-tf-${t}" class="tf-btn px-2 py-1 rounded text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5 transition-all ${t==='1y'?'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm':''}">${t.toUpperCase()}</button>`
         ).join('');
     }
 
     async setPeriod(p) {
         this.state.period = p;
-        document.querySelectorAll('.tf-btn').forEach(b =>
-            b.className = 'tf-btn px-3 py-1.5 rounded text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5 transition-all');
+        document.querySelectorAll('.tf-btn').forEach(b => b.className = 'tf-btn px-2 py-1 rounded text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5 transition-all');
         const btn = document.getElementById(`btn-tf-${p}`);
-        if(btn) btn.className = 'tf-btn px-3 py-1.5 rounded text-xs font-medium bg-white dark:bg-white/10 text-black dark:text-white shadow-sm';
+        if(btn) btn.className = 'tf-btn px-2 py-1 rounded text-xs font-medium bg-white dark:bg-white/10 text-black dark:text-white shadow-sm';
         if(this.state.symbol) await this._loadChart();
     }
 
@@ -827,8 +1015,27 @@ class Application {
     async _loadChart() {
         this.chartUI.showLoading(true);
         const data = await this.api.fetchChart(this.state.symbol, this.state.period);
-        this.chartUI.showLoading(false);
         this.chartUI.draw(data);
+        
+        // Fetch Technical Overlays
+        try {
+            const techData = await this.api.fetchTechnical(this.state.symbol);
+            if(techData.chart_data) {
+                this.chartUI.setOverlayData(techData.chart_data);
+                // Update Badge
+                if(techData.analysis && techData.analysis.score !== undefined) {
+                    const badge = document.getElementById('tech-signal-badge');
+                    const sc = techData.analysis.score;
+                    badge.classList.remove('hidden','bg-blue-500/20','text-blue-500','border-blue-500/30','bg-green-500/20','text-green-500','border-green-500/30','bg-red-500/20','text-red-500','border-red-500/30');
+                    if(sc > 20)      badge.classList.add('bg-green-500/20','text-green-500','border-green-500/30');
+                    else if(sc < -20) badge.classList.add('bg-red-500/20','text-red-500','border-red-500/30');
+                    else             badge.classList.add('bg-gray-500/20','text-gray-500','border-gray-500/30');
+                    badge.innerText = `Tech Score: ${sc}`;
+                }
+            }
+        } catch(e) { console.warn("No technical data", e); }
+        
+        this.chartUI.showLoading(false);
         this.state.lastFetch = Date.now();
         this._updateStatus();
     }
@@ -837,6 +1044,13 @@ class Application {
         this.state.symbol = symbol; this.state.name = name||symbol;
         document.getElementById('main-chart-symbol').innerText = symbol;
         document.getElementById('main-chart-name').innerText   = name;
+        document.getElementById('tech-signal-badge').classList.add('hidden'); // Reset badge
+
+        // Reset Overlays buttons
+        ['sma','bb'].forEach(k => {
+            const btn = document.getElementById('btn-ov-'+k);
+            if(btn) btn.classList.remove('bg-blue-500/20','text-blue-500','border-blue-500/50');
+        });
 
         // Reset Omni cards
         ['earnings-card','analyst-card','news-sentiment-card','insider-card'].forEach(id => {
@@ -844,14 +1058,11 @@ class Application {
             if(el) el.innerHTML = '<div class="text-gray-400">Lade...</div>';
         });
 
-        // Chart (sofort)
         await this._loadChart();
 
-        // Stock summary (Badge)
         const stock = await this.api.fetchStockSummary(symbol);
-        document.getElementById('data-source-badge').innerText = `Quelle: ${stock.source||'Yahoo'}`;
+        document.getElementById('data-source-badge').innerText = `Quelle: ${stock.source||'Finnhub/Yahoo'}`;
 
-        // Fundamentals
         const fmp = await this.api.fetchFundamentals(symbol);
         const fmt = n => isNaN(parseFloat(n)) ? 'N/A' : new Intl.NumberFormat('de-DE',{notation:'compact'}).format(parseFloat(n));
         document.getElementById('stats-grid').innerHTML = [
@@ -873,8 +1084,36 @@ class Application {
             ? news.map(n=>`<a href="${n.url}" target="_blank" class="hover:text-blue-400"><b>${n.source}:</b> ${n.headline}</a>`).join('<span class="mx-3 text-blue-500">•</span>')
             : 'Keine aktuellen News.';
 
-        // Omni Dashboard (async, füllt alle Sentiment-Cards)
+        // Lade das Omni Dashboard (Reddit, Fear&Greed etc)
         this.omni.load(symbol);
+    }
+
+    async runScreener() {
+        const uni = document.getElementById('screen-universe').value;
+        const pe  = document.getElementById('screen-pe').value || null;
+        const rsi = document.getElementById('screen-rsi').value || null;
+        
+        document.getElementById('screener-loading').classList.remove('hidden');
+        document.getElementById('screener-loading').classList.add('flex');
+        
+        try {
+            const res = await this.api.runScreener(uni, pe, rsi);
+            const tb = document.getElementById('screener-results');
+            tb.innerHTML = res.map(r => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <td class="px-6 py-4 font-bold text-blue-500">${r.Ticker}</td>
+                    <td class="px-6 py-4 font-mono">$${r.Price.toFixed(2)}</td>
+                    <td class="px-6 py-4 font-bold ${r['Change %']>=0?'text-green-500':'text-red-500'}">${r['Change %']>=0?'+':''}${r['Change %'].toFixed(2)}%</td>
+                    <td class="px-6 py-4">${r['P/E Ratio'] !== null ? r['P/E Ratio'].toFixed(1) : 'N/A'}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs font-bold ${r.Score>60?'bg-green-500/20 text-green-500':r.Score<40?'bg-red-500/20 text-red-500':'bg-gray-500/20 text-gray-500'}">${r.Score.toFixed(0)}</span></td>
+                    <td class="px-6 py-4 text-right">
+                        <button onclick="app.addWatchlist('${r.Ticker}','${r.Ticker}')" class="text-xs bg-gray-200 dark:bg-white/10 hover:bg-blue-500 hover:text-white px-3 py-1.5 rounded transition-colors font-bold">Laden</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch(e) { alert("Screener Fehler"); }
+        document.getElementById('screener-loading').classList.add('hidden');
+        document.getElementById('screener-loading').classList.remove('flex');
     }
 
     _setupSearch() {
@@ -896,16 +1135,14 @@ class Application {
                 resBox.classList.remove('hidden');
             }, 400);
         });
-        document.addEventListener('click', e => {
-            if(!input.contains(e.target) && !resBox.contains(e.target))
-                resBox.classList.add('hidden');
-        });
+        document.addEventListener('click', e => { if(!input.contains(e.target) && !resBox.contains(e.target)) resBox.classList.add('hidden'); });
     }
 
     async addWatchlist(symbol, name) {
         await this.api.modifyWatchlist('ADD', symbol, name);
         document.getElementById('search-input').value = '';
         document.getElementById('search-dropdown').classList.add('hidden');
+        document.querySelectorAll('.nav-btn')[0].click(); // Switch to terminal
         await this.loadWatchlist();
         this.loadAsset(symbol, name);
     }
@@ -919,26 +1156,40 @@ class Application {
     async loadWatchlist() {
         const data = await this.api.fetchWatchlist();
         const cont = document.getElementById('watchlist-container');
-        cont.innerHTML = data.length === 0
-            ? '<span class="text-xs text-gray-500">Keine Aktien. Nutze die Suche!</span>'
-            : data.map(item => `
-                <div onclick="app.loadAsset('${item.symbol}','${item.name}')" class="group relative flex items-baseline space-x-2 cursor-pointer bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 hover:border-blue-500 dark:hover:border-blue-500/50 px-3 py-2 rounded-xl transition-all shadow-sm">
-                    <span class="font-bold text-sm">${item.symbol}</span>
-                    <span class="text-xs text-gray-500">$${item.price}</span>
-                    <span class="text-[10px] font-bold ${item.isPositive?'text-green-500':'text-red-500'}">${item.change}</span>
-                    <button onclick="app.removeWatchlist('${item.symbol}',event)" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <i data-lucide="x" class="w-3 h-3"></i></button>
-                </div>`).join('');
+        cont.innerHTML = data.length === 0 ? '<span class="text-xs text-gray-500">Keine Aktien.</span>' : data.map(item => `
+            <div onclick="app.loadAsset('${item.symbol}','${item.name}')" class="group relative flex items-baseline space-x-2 cursor-pointer bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 hover:border-blue-500 px-3 py-2 rounded-xl transition-all shadow-sm">
+                <span class="font-bold text-sm">${item.symbol}</span>
+                <span class="text-[10px] font-bold ${item.isPositive?'text-green-500':'text-red-500'}">${item.change}</span>
+                <button onclick="app.removeWatchlist('${item.symbol}',event)" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <i data-lucide="x" class="w-3 h-3"></i></button>
+            </div>`).join('');
         lucide.createIcons();
-        if(data.length > 0 && !this.state.symbol)
-            this.loadAsset(data[0].symbol, data[0].name);
+        if(data.length > 0 && !this.state.symbol) this.loadAsset(data[0].symbol, data[0].name);
     }
+
+    _setupChat() {
+        document.getElementById('chat-input').addEventListener('keypress', async e => {
+            if(e.key!=='Enter'||!this.state.symbol||!e.target.value.trim()) return;
+            const msg = e.target.value.trim(); e.target.value = '';
+            const out = document.getElementById('chat-output');
+            out.innerHTML += `<div class="flex mt-3 justify-end"><div class="bg-purple-600 text-white text-xs px-4 py-3 rounded-2xl rounded-tr-none max-w-[85%]">${msg}</div></div>`;
+            out.scrollTop = out.scrollHeight;
+            const id = 'l-'+Date.now();
+            out.innerHTML += `<div id="${id}" class="flex mt-3 justify-start"><div class="bg-gray-100 dark:bg-white/5 px-4 py-2 rounded-2xl rounded-tl-none border dark:border-white/10"><i data-lucide="loader" class="w-4 h-4 animate-spin text-purple-500"></i></div></div>`;
+            lucide.createIcons(); out.scrollTop = out.scrollHeight;
+            
+            try {
+                const res = await this.api.chat(this.state.symbol, msg);
+                document.getElementById(id).remove();
+                out.innerHTML += `<div class="flex mt-3 justify-start"><div class="bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-gray-200 text-xs px-4 py-3 rounded-2xl rounded-tl-none max-w-[95%] border dark:border-white/10 prose dark:prose-invert">${marked.parse(res.reply)}</div></div>`;
+            } catch(err) { document.getElementById(id).remove(); }
+            out.scrollTop = out.scrollHeight;
+        });
+    }
+    toggleOverlay(type) { this.chartUI.toggleOverlay(type); }
 }
 
-// Start
-document.addEventListener('DOMContentLoaded', () => {
-    requestAnimationFrame(() => { window.app = new Application(); });
-});
+document.addEventListener('DOMContentLoaded', () => { requestAnimationFrame(() => { window.app = new Application(); }); });
 </script>
 </body>
 </html>

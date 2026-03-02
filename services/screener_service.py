@@ -3,47 +3,72 @@ services/screener_service.py - Logik für den Aktien-Screener
 """
 import pandas as pd
 from data.openbb_client import get_client
+from concurrent.futures import ThreadPoolExecutor
+from loguru import logger
+from services.technical_analysis_service import get_technical_analysis_service
 
-# Vordefinierte Listen für den Screener (wie in deiner Dokumentation gefordert)
+# Vordefinierte Listen für den Screener
 UNIVERSES = {
-    "mega_cap_us": ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA"],
-    "dax_40": ["SAP.DE", "SIE.DE", "ALV.DE", "DPW.DE", "MBG.DE", "DTE.DE", "VOW3.DE"],
-    "tech_growth": ["PLTR", "CRWD", "SNOW", "DDOG", "NET", "SHOP"]
+    "mega_cap_us": ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "BRK-B", "LLY", "AVGO"],
+    "dax_40": ["SAP.DE", "SIE.DE", "ALV.DE", "DPW.DE", "MBG.DE", "DTE.DE", "VOW3.DE", "BMW.DE", "BAS.DE", "MUV2.DE"],
+    "tech_growth": ["PLTR", "CRWD", "SNOW", "DDOG", "NET", "SHOP", "MNDY", "ZS", "U", "RBLX"]
 }
 
 class ScreenerService:
     def __init__(self):
         self.client = get_client()
+        self.tech = get_technical_analysis_service()
 
-    def run_screen(self, universe: list, filters: dict = None) -> pd.DataFrame:
-        """Führt den Screener für eine Liste von Tickern durch und berechnet den Score."""
-        results = []
-        for ticker in universe:
+    def _analyze_ticker(self, ticker: str) -> dict:
+        """Hilfsfunktion für ThreadPoolExecutor - Holt Quote + Tech Score für einen Ticker."""
+        try:
             quote = self.client.get_quote(ticker)
+            price = quote.get("price", 0)
+            if not price: return None
             
-            # Basis Composite Score (0-100) berechnen
-            score = 50 
-            change = quote.get("change_pct", 0)
-            if change > 0:
-                score += 15  # Pluspunkte für Momentum
-            elif change < -2:
-                score -= 10  # Minuspunkte für starken Abverkauf
-                
-            results.append({
+            # Technik-Score holen für "God-Mode" Screening
+            df = self.tech.get_price_data(ticker, period="3mo")
+            tech_analysis = self.tech.analyze_indicators(df)
+            score = tech_analysis.get("score", 50)
+            rsi = tech_analysis.get("latest_data", {}).get("rsi", 50)
+
+            return {
                 "Ticker": ticker,
-                "Price": quote.get("price", 0),
-                "Change %": change,
-                "P/E Ratio": quote.get("pe_ratio", 0),
-                "Score": min(max(score, 0), 100) # Score zwischen 0 und 100 halten
-            })
-            
+                "Price": price,
+                "Change %": quote.get("change_pct", 0) * 100,
+                "P/E Ratio": quote.get("pe_ratio"),
+                "Score": score,
+                "RSI": rsi
+            }
+        except Exception as e:
+            logger.warning(f"Screener Fehler für {ticker}: {e}")
+            return None
+
+    def run_screen(self, universe_key: str, filters: dict = None) -> pd.DataFrame:
+        """
+        Führt den Screener für eine Liste von Tickern durch und berechnet den Score.
+        Neu v4.0: Nutzt ThreadPoolExecutor für massive Beschleunigung.
+        """
+        tickers = UNIVERSES.get(universe_key, UNIVERSES["mega_cap_us"])
+        
+        results = []
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            for res in executor.map(self._analyze_ticker, tickers):
+                if res: results.append(res)
+                
         df = pd.DataFrame(results)
-        
+        if df.empty: return df
+
         # Filter anwenden (falls in der UI ausgewählt)
-        if filters and not df.empty:
-            if "pe_max" in filters:
-                df = df[(df["P/E Ratio"] <= filters["pe_max"]) | (df["P/E Ratio"].isna())]
-        
+        if filters:
+            pe_max = filters.get("pe_max")
+            if pe_max and pe_max != "":
+                df = df[(df["P/E Ratio"].isna()) | (df["P/E Ratio"] == "N/A") | (pd.to_numeric(df["P/E Ratio"], errors='coerce') <= float(pe_max))]
+                
+            rsi_min = filters.get("rsi_min")
+            if rsi_min and rsi_min != "":
+                df = df[df["RSI"] >= float(rsi_min)]
+
         # Nach bestem Score sortieren
         if not df.empty:
             df = df.sort_values(by="Score", ascending=False)
@@ -51,7 +76,7 @@ class ScreenerService:
         return df
 
     def get_display_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Formatiert das DataFrame schön für die Streamlit-Tabelle."""
+        """Formatiert das DataFrame schön für die Streamlit-Tabelle (Original v3.1 Funktion)."""
         if df.empty:
             return df
             
@@ -59,7 +84,6 @@ class ScreenerService:
         df_display["Price"] = df_display["Price"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "N/A")
         df_display["Change %"] = df_display["Change %"].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "N/A")
         
-        # Score als Balken formatieren (optional, sieht in Streamlit toll aus)
         return df_display
 
 # --- SINGLETON PATTERN ---

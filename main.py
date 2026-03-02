@@ -13,31 +13,32 @@ load_dotenv()
 
 from data.openbb_client import get_client
 from data.fingpt_client import get_fingpt_client, AVAILABLE_MODELS
+from services.omni_data_service import get_omni_service
+from data.cache_manager import get_cache, TTL
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("[STARTUP] Lade Watchlist-Cache vor...")
-    try:
-        items = load_watchlist_data()
-        for item in items:
-            client.get_quote(item["symbol"])
-    except Exception as e:
-        pass
-    yield
+omni_service = get_omni_service()
+cache        = get_cache()
 
+# ── Pydantic Models ───────────────────────────────────────────────────────────
+class WatchlistItem(BaseModel):
+    symbol: str
+    name: str
 
-app = FastAPI(title="AI-Analyst Backend", lifespan=lifespan)
+class ChatMessage(BaseModel):
+    symbol: str
+    message: str
+    model: str = "mistralai/Mistral-7B-Instruct-v0.3"
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+class OmniAnalyzeRequest(BaseModel):
+    symbol: str
+    model:  str = "mistralai/Mistral-7B-Instruct-v0.3"
+    focus:  str = "full"
 
-client = get_client()
+class ReportRequest(BaseModel):
+    symbol: str
+    model:  str = "mistralai/Mistral-7B-Instruct-v0.3"
 
+# ── Watchlist Helpers ─────────────────────────────────────────────────────────
 WATCHLIST_FILE = "watchlist.json"
 DEFAULT_WATCHLIST = [
     {"symbol": "AAPL", "name": "Apple Inc."},
@@ -54,38 +55,48 @@ def load_watchlist_data():
     try:
         with open(WATCHLIST_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except: return DEFAULT_WATCHLIST
+    except:
+        return DEFAULT_WATCHLIST
 
 def save_watchlist_data(data):
     with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
-class WatchlistItem(BaseModel):
-    symbol: str
-    name: str
+# ── Lifespan ──────────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("[STARTUP] Lade Watchlist-Cache vor...")
+    try:
+        for item in load_watchlist_data():
+            client.get_quote(item["symbol"])
+    except Exception as e:
+        logger.warning(f"[STARTUP] {e}")
+    yield
 
-class ChatMessage(BaseModel):
-    symbol: str
-    message: str
-    model: str = "mistralai/Mistral-7B-Instruct-v0.3"
+# ── App Setup ─────────────────────────────────────────────────────────────────
+app = FastAPI(title="AI-Analyst Backend v3.1 – Omni-Data", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+                   allow_methods=["*"], allow_headers=["*"])
 
+client    = get_client()
 ai_client = get_fingpt_client()
 
-@app.get("/api/models")
-def get_models():
-    """Liefert verfügbare HuggingFace-Modelle ans Frontend."""
-    return AVAILABLE_MODELS
+# ═════════════════════════════════════════════════════════════════════════════
+# BESTEHENDE ENDPUNKTE
+# ═════════════════════════════════════════════════════════════════════════════
 
 @app.get("/")
 def serve_frontend():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    return FileResponse(os.path.join(base_dir, "index.html"))
+    return FileResponse(os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html"))
+
+@app.get("/api/models")
+def get_models():
+    return AVAILABLE_MODELS
 
 @app.get("/api/watchlist")
 def get_watchlist():
-    items = load_watchlist_data()
     data = []
-    for item in items:
+    for item in load_watchlist_data():
         t = item["symbol"]
         quote = client.get_quote(t)
         if quote and quote.get("price", 0) > 0:
@@ -109,16 +120,14 @@ def add_to_watchlist(item: WatchlistItem):
 
 @app.delete("/api/watchlist/{symbol}")
 def remove_from_watchlist(symbol: str):
-    items = load_watchlist_data()
-    items = [i for i in items if i["symbol"] != symbol.upper()]
-    save_watchlist_data(items)
+    save_watchlist_data([i for i in load_watchlist_data() if i["symbol"] != symbol.upper()])
     return {"status": "success"}
 
 @app.get("/api/search")
 def search_ticker(q: str = ""):
     if not q: return []
-    results = client.search_ticker(q)
-    return [{"symbol": r["ticker"], "name": r["name"], "type": r.get("type", "Aktie")} for r in results]
+    return [{"symbol": r["ticker"], "name": r["name"], "type": r.get("type", "Aktie")}
+            for r in client.search_ticker(q)]
 
 @app.get("/api/chart/{symbol}")
 def get_chart_data(symbol: str, period: str = "1y"):
@@ -126,51 +135,34 @@ def get_chart_data(symbol: str, period: str = "1y"):
     if result is None: return []
     df, source = result
     if df is None or df.empty: return []
-
-    df = df.dropna(subset=['open', 'high', 'low', 'close'])
-    df = df[~df.index.duplicated(keep='last')]
-    df = df.sort_index(ascending=True)
-
-    chart_data = []
-    is_intraday = period in ["1d", "5d", "1mo"]
-    
+    df = df.dropna(subset=["open","high","low","close"])
+    df = df[~df.index.duplicated(keep="last")].sort_index()
+    is_intraday = period in ["1d","5d","1mo"]
+    out = []
     for date, row in df.iterrows():
         try:
-            time_val = int(date.timestamp()) if is_intraday else date.strftime('%Y-%m-%d')
-            chart_data.append({
-                "time": time_val,
-                "open": round(float(row['open']), 2),
-                "high": round(float(row['high']), 2),
-                "low": round(float(row['low']), 2),
-                "close": round(float(row['close']), 2),
-                "value": round(float(row['close']), 2)
-            })
+            out.append({"time": int(date.timestamp()) if is_intraday else date.strftime("%Y-%m-%d"),
+                        "open": round(float(row["open"]),2), "high": round(float(row["high"]),2),
+                        "low": round(float(row["low"]),2),   "close": round(float(row["close"]),2),
+                        "value": round(float(row["close"]),2)})
         except: continue
-    return chart_data
+    return out
 
 @app.get("/api/stock/{symbol}")
 def get_stock(symbol: str):
-    quote = client.get_quote(symbol)
-    price = quote.get('price', 0)
+    quote      = client.get_quote(symbol)
+    price      = quote.get("price", 0)
     change_pct = quote.get("change_pct", 0) * 100
-    source = quote.get('source', 'Unbekannt')
-
     try:
-        prompt = (
-            f"Aktie: {symbol} | Preis: ${price:.2f} | "
-            f"Tagesänderung: {change_pct:+.2f}% | KGV: {quote.get('pe_ratio', 'N/A')}\n"
-            f"Schreibe eine prägnante 2-Satz Einschätzung zu dieser Aktie auf Deutsch."
-        )
-        ai_summary = ai_client.ask(prompt)
+        ai_summary = ai_client.ask(
+            f"Aktie: {symbol} | Preis: ${price:.2f} | Tagesänderung: {change_pct:+.2f}% | "
+            f"KGV: {quote.get('pe_ratio','N/A')}\n"
+            f"Schreibe eine prägnante 2-Satz Einschätzung zu dieser Aktie auf Deutsch.")
     except Exception as e:
         ai_summary = f"{symbol} notiert bei ${price:.2f} ({change_pct:+.2f}%). KI nicht verfügbar: {str(e)[:80]}"
-    
-    return {
-        "symbol": symbol.upper(),
-        "ai_summary": ai_summary,
-        "recommendation": "KAUFEN" if change_pct > 0 else "BEOBACHTEN",
-        "source": source
-    }
+    return {"symbol": symbol.upper(), "ai_summary": ai_summary,
+            "recommendation": "KAUFEN" if change_pct > 0 else "BEOBACHTEN",
+            "source": quote.get("source","Unbekannt")}
 
 @app.get("/api/news/{symbol}")
 def get_news(symbol: str):
@@ -180,72 +172,165 @@ def get_news(symbol: str):
 def chat_with_ai(chat: ChatMessage):
     try:
         quote = client.get_quote(chat.symbol)
-        prompt = (
-            f"Aktie: {chat.symbol} | Preis: ${quote.get('price', '?')} | "
-            f"KGV: {quote.get('pe_ratio', 'N/A')} | "
-            f"Tagesänderung: {quote.get('change_pct', 0)*100:+.2f}%\n\n"
-            f"Nutzerfrage: {chat.message}"
-        )
-        reply = ai_client.ask(prompt, model_id=chat.model)
+        reply = ai_client.ask(
+            f"Aktie: {chat.symbol} | Preis: ${quote.get('price','?')} | "
+            f"KGV: {quote.get('pe_ratio','N/A')} | "
+            f"Tagesänderung: {quote.get('change_pct',0)*100:+.2f}%\n\nNutzerfrage: {chat.message}",
+            model_id=chat.model)
         return {"reply": reply, "model_used": chat.model}
     except Exception as e:
-        logger.error(f"[FinGPT ERROR] {e}")
         return {"reply": f"FinGPT-Fehler: {str(e)}"}
 
 @app.get("/api/fmp/{symbol}")
 def get_fmp_data(symbol: str):
-    fmp_key = os.getenv("FMP_API_KEY", "")
-    finnhub_key = os.getenv("FINNHUB_API_KEY", "")
-    final_data = { "revenue": "N/A", "netIncome": "N/A", "eps": "N/A", "peRatio": "N/A", "marketCap": "N/A", "debtToEquity": "N/A", "source": "Unbekannt" }
-    fmp_success = False
-
+    fmp_key     = os.getenv("FMP_API_KEY","")
+    finnhub_key = os.getenv("FINNHUB_API_KEY","")
+    d = {"revenue":"N/A","netIncome":"N/A","eps":"N/A","peRatio":"N/A",
+         "marketCap":"N/A","debtToEquity":"N/A","source":"Unbekannt"}
+    ok = False
     if fmp_key:
         try:
-            url_income = f"https://financialmodelingprep.com/stable/income-statement?symbol={symbol}&limit=1&apikey={fmp_key}"
-            url_metrics = f"https://financialmodelingprep.com/stable/key-metrics?symbol={symbol}&limit=1&apikey={fmp_key}"
-            resp_inc = requests.get(url_income, timeout=5).json()
-            resp_met = requests.get(url_metrics, timeout=5).json()
-            if isinstance(resp_inc, list) and len(resp_inc) > 0:
-                inc = resp_inc[0]
-                met = resp_met[0] if isinstance(resp_met, list) and len(resp_met) > 0 else {}
-                final_data.update({
-                    "revenue": inc.get("revenue", "N/A"), "netIncome": inc.get("netIncome", "N/A"),
-                    "eps": inc.get("eps", "N/A"), "peRatio": met.get("peRatio", "N/A"),
-                    "marketCap": met.get("marketCap", "N/A"), "debtToEquity": met.get("debtToEquity", "N/A"),
-                    "source": "FMP"
-                })
-                fmp_success = True
+            inc = requests.get(f"https://financialmodelingprep.com/stable/income-statement?symbol={symbol}&limit=1&apikey={fmp_key}",timeout=5).json()
+            met = requests.get(f"https://financialmodelingprep.com/stable/key-metrics?symbol={symbol}&limit=1&apikey={fmp_key}",timeout=5).json()
+            if isinstance(inc,list) and inc:
+                m = met[0] if isinstance(met,list) and met else {}
+                d.update({"revenue":inc[0].get("revenue","N/A"),"netIncome":inc[0].get("netIncome","N/A"),
+                          "eps":inc[0].get("eps","N/A"),"peRatio":m.get("peRatio","N/A"),
+                          "marketCap":m.get("marketCap","N/A"),"debtToEquity":m.get("debtToEquity","N/A"),"source":"FMP"})
+                ok = True
         except: pass
-
-    if finnhub_key and (not fmp_success or final_data["peRatio"] in [None, "N/A", ""]):
+    if finnhub_key and (not ok or d["peRatio"] in [None,"N/A",""]):
         try:
-            url_metrics = f"https://finnhub.io/api/v1/stock/metric?symbol={symbol}&metric=all&token={finnhub_key}"
-            fh = requests.get(url_metrics, timeout=3).json().get("metric", {})
+            fh = requests.get(f"https://finnhub.io/api/v1/stock/metric?symbol={symbol}&metric=all&token={finnhub_key}",timeout=3).json().get("metric",{})
             if fh:
-                if final_data["peRatio"] in [None, "N/A", ""]: final_data["peRatio"] = fh.get("peNormalizedAnnual", "N/A")
-                if final_data["eps"] in [None, "N/A", ""]: final_data["eps"] = fh.get("epsTrailingTwelveMonths", "N/A")
-                if final_data["marketCap"] in [None, "N/A", ""]: 
-                    mcap = fh.get("marketCapitalization")
-                    final_data["marketCap"] = mcap * 1000000 if mcap else "N/A"
-                if final_data["debtToEquity"] in [None, "N/A", ""]: final_data["debtToEquity"] = fh.get("totalDebt/totalEquityAnnual", "N/A")
-                final_data["source"] = "FMP & Finnhub" if fmp_success else "Finnhub"
+                if d["peRatio"] in [None,"N/A",""]:     d["peRatio"]      = fh.get("peNormalizedAnnual","N/A")
+                if d["eps"] in [None,"N/A",""]:          d["eps"]          = fh.get("epsTrailingTwelveMonths","N/A")
+                if d["marketCap"] in [None,"N/A",""]:
+                    mc = fh.get("marketCapitalization")
+                    d["marketCap"] = mc*1_000_000 if mc else "N/A"
+                if d["debtToEquity"] in [None,"N/A",""]: d["debtToEquity"] = fh.get("totalDebt/totalEquityAnnual","N/A")
+                d["source"] = "FMP & Finnhub" if ok else "Finnhub"
         except: pass
-
-    if final_data["source"] == "Unbekannt":
+    if d["source"] == "Unbekannt":
         try:
             import yfinance as yf
             i = yf.Ticker(symbol).info
-            final_data.update({
-                "revenue": i.get("totalRevenue", "N/A"), "netIncome": i.get("netIncomeToCommon", "N/A"),
-                "eps": i.get("trailingEps", "N/A"), "peRatio": i.get("trailingPE", "N/A"),
-                "marketCap": i.get("marketCap", "N/A"), "debtToEquity": (i.get("debtToEquity") / 100) if i.get("debtToEquity") else "N/A",
-                "source": "Yahoo Finance"
-            })
+            d.update({"revenue":i.get("totalRevenue","N/A"),"netIncome":i.get("netIncomeToCommon","N/A"),
+                      "eps":i.get("trailingEps","N/A"),"peRatio":i.get("trailingPE","N/A"),
+                      "marketCap":i.get("marketCap","N/A"),
+                      "debtToEquity":(i.get("debtToEquity")/100 if i.get("debtToEquity") else "N/A"),
+                      "source":"Yahoo Finance"})
         except: pass
+    for k,v in d.items():
+        if v is None: d[k] = "N/A"
+    return d
 
-    for k, v in final_data.items():
-        if v is None: final_data[k] = "N/A"
-    return final_data
+# ── Legacy /api/report → leitet auf Omni weiter ───────────────────────────────
+@app.post("/api/report")
+def generate_report(req: ReportRequest):
+    return omni_analyze(OmniAnalyzeRequest(symbol=req.symbol, model=req.model, focus="full"))
+
+# ═════════════════════════════════════════════════════════════════════════════
+# NEU: OMNI-DATA ENDPUNKTE
+# ═════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/omni/{symbol}")
+def get_omni_bundle(symbol: str):
+    """Vollständiger Omni-Data-Bundle aus allen Quellen parallel. Cache: 10 Min."""
+    key    = f"omni:{symbol.upper()}"
+    cached = cache.get(key)
+    if cached: return cached
+    bundle = omni_service.get_bundle(symbol)
+    cache.set(key, bundle, ttl=TTL["screener"])
+    return bundle
+
+@app.post("/api/omni/analyze")
+def omni_analyze(req: OmniAnalyzeRequest):
+    """Omni-Bundle + LLM-Analyse in einem Aufruf. Cache: 15 Min."""
+    key    = f"omni_report:{req.symbol.upper()}:{req.model}:{req.focus}"
+    cached = cache.get(key)
+    if cached: return cached
+
+    bundle = omni_service.get_bundle(req.symbol)
+    prompt = omni_service.build_llm_prompt(bundle, analysis_focus=req.focus)
+
+    try:
+        report = ai_client.ask(prompt, model_id=req.model)
+    except Exception as e:
+        logger.error(f"[OmniAnalyze] {e}")
+        report = f"**KI temporär nicht verfügbar.**\n\nFehler: {str(e)}"
+
+    result = {
+        "symbol":     req.symbol.upper(),
+        "report":     report,
+        "bundle":     bundle,
+        "prompt_len": len(prompt),
+        "timestamp":  bundle.get("timestamp"),
+        "errors":     bundle.get("errors",[]),
+    }
+    cache.set(key, result, ttl=900)
+    return result
+
+@app.get("/api/reddit/{symbol}")
+def get_reddit_sentiment(symbol: str):
+    """Reddit Sentiment & Mentions (r/wsb, r/stocks, r/investing). Cache: 10 Min."""
+    key = f"reddit:{symbol.upper()}"
+    c   = cache.get(key)
+    if c: return c
+    from data.reddit_client import get_reddit_client
+    result = get_reddit_client().get_ticker_sentiment(symbol)
+    cache.set(key, result, ttl=600)
+    return result
+
+@app.get("/api/trends/{symbol}")
+def get_google_trends(symbol: str):
+    """Google Trends Suchinteresse (90 Tage). Cache: 1h."""
+    key = f"trends:{symbol.upper()}"
+    c   = cache.get(key)
+    if c: return c
+    from data.trends_client import get_trends_client
+    result = get_trends_client().get_interest(symbol)
+    cache.set(key, result, ttl=3600)
+    return result
+
+@app.get("/api/sec/{symbol}")
+def get_sec_data(symbol: str):
+    """SEC EDGAR: Insider-Zusammenfassung + aktuelle Filings. Cache: 1h."""
+    key = f"sec:{symbol.upper()}"
+    c   = cache.get(key)
+    if c: return c
+    from data.sec_client import get_sec_client
+    s      = get_sec_client()
+    result = {"insider_summary": s.get_insider_summary(symbol),
+              "recent_filings":  s.get_recent_filings(symbol)}
+    cache.set(key, result, ttl=3600)
+    return result
+
+@app.get("/api/signals")
+def get_market_signals():
+    """Globale Marktsignale: Fear & Greed + VIX/DXY/TNX. Cache: 5 Min."""
+    key = "global_signals"
+    c   = cache.get(key)
+    if c: return c
+    from data.signals_client import get_signals_client
+    s      = get_signals_client()
+    result = {"fear_greed": s.get_fear_greed(), "macro": s.get_macro_signals()}
+    cache.set(key, result, ttl=300)
+    return result
+
+@app.get("/api/signals/{symbol}")
+def get_stock_signals(symbol: str):
+    """Aktienspezifisch: Earnings, Analyst Ratings, News Sentiment. Cache: 10 Min."""
+    key = f"signals:{symbol.upper()}"
+    c   = cache.get(key)
+    if c: return c
+    from data.signals_client import get_signals_client
+    s      = get_signals_client()
+    result = {"earnings":       s.get_earnings_calendar(symbol),
+              "analyst":        s.get_analyst_ratings(symbol),
+              "news_sentiment": s.get_news_sentiment(symbol)}
+    cache.set(key, result, ttl=TTL["screener"])
+    return result
 
 if __name__ == "__main__":
     import uvicorn

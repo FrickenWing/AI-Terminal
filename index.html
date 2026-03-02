@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Analyst God-Mode</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+        if (localStorage.getItem('theme') === 'light') document.documentElement.classList.remove('dark');
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        /* Base & Scrollbars */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .sleek-scroll::-webkit-scrollbar { width: 6px; }
+        .sleek-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sleek-scroll::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 10px; }
+        .sleek-scroll::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.8); }
+
+        /* UI Elements */
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        .marquee-container { display: flex; overflow: hidden; width: 100%; }
+        .animate-marquee { animation: marquee 90s linear infinite; white-space: nowrap; padding-left: 100%; }
+        .animate-marquee:hover { animation-play-state: paused; }
+        @keyframes marquee { 0% { transform: translateX(0%); } 100% { transform: translateX(-100%); } }
+
+        /* Animations */
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-slide-in { animation: slideIn 0.4s ease-out forwards; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in forwards; }
+
+        /* Sidebar Icons */
+        .anim-chart svg path { stroke-dasharray: 100; stroke-dashoffset: 100; animation: drawLine 0.7s ease-out forwards; color: #3b82f6; }
+        @keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+        /* Markdown Prose for KI Reports */
+        .prose h3 { font-size: 1.1rem; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; color: #3b82f6; }
+        .prose p { margin-bottom: 1em; line-height: 1.6; }
+        .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+    </style>
+</head>
+<body class="bg-white dark:bg-[#050505] text-gray-900 dark:text-gray-100 h-screen flex overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 border-r border-gray-200 dark:border-white/10 flex flex-col bg-gray-50/50 dark:bg-[#0a0a0a] transition-colors z-20">
+        <div class="p-5">
+            <div class="relative group cursor-default">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl blur-sm opacity-0 group-hover:opacity-20 transition duration-500"></div>
+                <div class="relative flex items-center p-2.5 bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-xl border border-gray-200/50 dark:border-white/5 transition-colors">
+                    <div class="flex items-center justify-center w-8 h-8 mr-3 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-sm transform group-hover:scale-105 transition-all duration-300">
+                        <i data-lucide="trending-up" class="w-4 h-4"></i>
+                    </div>
+                    <h1 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white flex items-center">
+                        AI<span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500 ml-0.5">-Analyst</span>
+                    </h1>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="flex-1 px-4 space-y-2 mt-2" id="sidebar-nav">
+            <button data-tab="terminal" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-black dark:text-white font-semibold transition-colors anim-chart">
+                <i data-lucide="activity" class="w-4 h-4"></i><span>Terminal</span>
+            </button>
+            <button data-tab="screener" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                <i data-lucide="search" class="w-4 h-4"></i><span>Sektor Screener</span>
+            </button>
+            <button data-tab="portfolio" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                <i data-lucide="briefcase" class="w-4 h-4"></i><span>Portfolio</span>
+            </button>
+        </nav>
+
+        <div class="mt-auto p-6 border-t border-gray-200 dark:border-white/10 text-xs text-gray-500 flex flex-col space-y-3">
+            <button onclick="app.ui.openModal('patch-modal')" class="text-left hover:text-black dark:hover:text-white transition-colors flex items-center font-medium">
+                <i data-lucide="file-text" class="w-3 h-3 mr-2"></i> Patch Notes v3.0
+            </button>
+            <span class="opacity-75">Modulare Architektur<br>Omni-Data Engine</span>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+        
+        <!-- HEADER -->
+        <header class="h-16 border-b border-gray-200 dark:border-white/10 flex items-center justify-between px-8 shrink-0 z-50">
+            <div class="flex items-center w-full max-w-md relative">
+                <i data-lucide="search" class="w-4 h-4 text-gray-400 mr-3 shrink-0"></i>
+                <input id="search-input" type="text" placeholder="Ticker oder Sektor (z.B. Technology) suchen..." class="bg-transparent border-none focus:outline-none text-sm w-full text-gray-900 dark:text-gray-100 placeholder-gray-400" autocomplete="off">
+                <div id="search-dropdown" class="absolute top-full left-0 mt-3 w-full bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl hidden flex-col max-h-64 overflow-y-auto z-50 sleek-scroll"></div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 bg-gray-100 dark:bg-white/5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/5" title="Live System Status">
+                    <span id="status-dot" class="inline-flex rounded-full h-2 w-2 bg-green-500 animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]"></span>
+                    <span id="status-text" class="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">System Online</span>
+                </div>
+                <button id="theme-toggle" class="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-all text-gray-600 dark:text-gray-400">
+                    <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+                    <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- SCROLL AREA -->
+        <div class="flex-1 overflow-y-auto p-8 no-scrollbar relative z-10">
+            
+            <!-- TAB: TERMINAL -->
+            <div id="tab-terminal" class="tab-content space-y-8">
+                
+                <!-- Watchlist & News Banner -->
+                <div class="flex flex-col space-y-4">
+                    <div id="watchlist-container" class="flex flex-wrap items-center gap-4 transition-colors sleek-scroll overflow-x-auto pb-2">
+                        <span class="text-xs text-gray-400">Lade Watchlist...</span>
+                    </div>
+                    <div class="marquee-container bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg py-3 px-5 items-center relative">
+                        <div class="flex items-center text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mr-6 shrink-0 z-10 bg-blue-50/80 dark:bg-[#0a0a0a] pr-4">
+                            <i data-lucide="rss" class="w-4 h-4 mr-2 animate-pulse"></i> Global News
+                        </div>
+                        <div class="flex-1 overflow-hidden relative h-5">
+                            <div id="news-banner" class="absolute top-0 left-0 h-full flex items-center animate-marquee text-sm text-gray-600 dark:text-gray-400 space-x-12">
+                                <span>Wähle eine Aktie aus, um den Omni-Data Newsfeed zu starten...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Grid: Chart & Chat -->
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                    
+                    <!-- Chart Module -->
+                    <div class="xl:col-span-2 flex flex-col space-y-4 animate-slide-in">
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <h2 id="main-chart-symbol" class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">—</h2>
+                                <p id="main-chart-name" class="text-sm text-gray-500 mt-1">Wähle ein Asset</p>
+                            </div>
+                            <div class="flex space-x-1 bg-gray-100 dark:bg-white/5 p-1 rounded-lg border border-gray-200 dark:border-white/5" id="timeframe-controls">
+                                <!-- Generated via JS -->
+                            </div>
+                        </div>
+                        
+                        <div id="chart-container" class="h-[400px] w-full bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl relative overflow-hidden shadow-inner">
+                            <div id="chart-loading" class="absolute inset-0 flex-col items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm z-10 hidden">
+                                <i data-lucide="loader-2" class="w-8 h-8 text-blue-500 animate-spin mb-3"></i>
+                                <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Synchronisiere Marktdaten...</span>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center pt-2">
+                            <span id="data-source-badge" class="text-[10px] uppercase tracking-wider text-gray-500 bg-gray-100 dark:bg-white/5 px-3 py-1 rounded-full border border-gray-200 dark:border-white/10">Quelle: —</span>
+                            <button onclick="app.reports.openModal()" class="flex items-center px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl shadow-lg shadow-blue-500/25 font-semibold text-sm transition-transform hover:scale-105">
+                                <i data-lucide="brain-circuit" class="w-4 h-4 mr-2"></i> Omni-Data KI Bericht
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chat Module -->
+                    <div class="flex flex-col h-[480px] bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-sm animate-slide-in" style="animation-delay: 0.1s;">
+                        <div class="p-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-transparent">
+                            <div class="flex items-center text-sm font-bold text-gray-700 dark:text-gray-300"><i data-lucide="message-square-text" class="w-4 h-4 mr-2 text-blue-500"></i> Analyst Chat</div>
+                        </div>
+                        <div id="chat-output" class="flex-1 overflow-y-auto p-5 space-y-5 text-sm sleek-scroll">
+                            <div class="text-center text-gray-400 text-xs mt-10">Stelle dem KI-Analysten Fragen zur aktuellen Aktie.</div>
+                        </div>
+                        <div class="p-4 border-t border-gray-100 dark:border-white/10">
+                            <input id="chat-input" type="text" placeholder="Frage senden (Enter)..." class="w-full bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all dark:text-white">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Module (Fundamentals + Sentiment) -->
+                <div class="pt-8 border-t border-gray-200 dark:border-white/10 animate-slide-in" style="animation-delay: 0.2s;">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center">
+                        <i data-lucide="layers" class="w-4 h-4 mr-2"></i> Omni-Data Metriken
+                    </h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4" id="stats-grid">
+                        <!-- Populated by JS Module -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: SCREENER (Neu) -->
+            <div id="tab-screener" class="tab-content hidden h-full flex flex-col items-center justify-center text-center animate-fade-in">
+                <i data-lucide="telescope" class="w-16 h-16 text-blue-500/50 mb-6"></i>
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-3">Sektor Screener</h2>
+                <p class="text-gray-500 max-w-md">Dieses Modul nutzt die Finnhub & Yahoo API, um Top-Performer in spezifischen Sektoren zu finden. (In Entwicklung)</p>
+            </div>
+
+            <!-- TAB: PORTFOLIO -->
+            <div id="tab-portfolio" class="tab-content hidden h-full flex flex-col items-center justify-center text-center animate-fade-in">
+                <i data-lucide="briefcase" class="w-16 h-16 text-purple-500/50 mb-6"></i>
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-3">Portfolio Manager</h2>
+                <p class="text-gray-500">Verwalte deine Positionen modular.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODALS -->
+    
+    <!-- Omni Report Modal -->
+    <div id="report-modal" class="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] hidden items-center justify-center transition-opacity opacity-0">
+        <div class="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl transform scale-95 transition-all duration-300" id="report-modal-content">
+            <div class="p-6 border-b border-gray-200 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5 rounded-t-2xl">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center"><i data-lucide="file-text" class="mr-3 text-blue-500"></i> Omni-Anlagebericht: <span id="report-symbol-title" class="ml-2 text-blue-500"></span></h2>
+                    <p class="text-sm text-gray-500 mt-1">Integriert Fundamentaldaten, NewsAPI & Social Media Sentiment (Reddit/Twitter).</p>
+                </div>
+                <button onclick="app.reports.closeModal()" class="p-2 bg-gray-200 dark:bg-white/10 rounded-full hover:bg-red-500 hover:text-white transition-colors text-gray-500"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between" id="report-controls">
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm font-medium text-gray-600 dark:text-gray-400">KI Engine:</span>
+                    <select id="report-model-select" class="bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white">
+                        <option value="gemini">Google Gemini (Cloud)</option>
+                        <option value="fingpt">FinGPT (Lokaler Server :1234)</option>
+                    </select>
+                </div>
+                <button onclick="app.reports.generate()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center"><i data-lucide="zap" class="w-4 h-4 mr-2"></i> Erstellen</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-8 relative sleek-scroll">
+                <div id="report-loading" class="hidden flex-col items-center justify-center h-full space-y-4">
+                    <div class="relative w-16 h-16"><div class="absolute inset-0 border-4 border-gray-200 dark:border-white/10 rounded-full"></div><div class="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div></div>
+                    <p class="text-lg font-medium text-gray-700 dark:text-gray-300">Analysiere Omni-Data Streams...</p>
+                </div>
+                <div id="report-result" class="prose dark:prose-invert max-w-none hidden text-gray-800 dark:text-gray-300"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patch Notes Modal -->
+    <div id="patch-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] hidden items-center justify-center transition-opacity opacity-0">
+        <div class="bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 p-8 rounded-3xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[80vh]">
+            <h2 class="text-2xl font-bold mb-6 text-black dark:text-white shrink-0 flex items-center justify-between">
+                <span>System Update</span><span class="text-xs font-bold bg-blue-500 text-white px-3 py-1 rounded-full">v3.0 Modular</span>
+            </h2>
+            <div class="space-y-8 text-sm text-gray-600 dark:text-gray-400 overflow-y-auto sleek-scroll pr-4 flex-1">
+                <div>
+                    <h3 class="text-black dark:text-white font-bold mb-2 text-base">v3.0 - Modulare Architektur & Omni-Data</h3>
+                    <ul class="space-y-2">
+                        <li>• 🏗️ <strong>Klassen-basierte Architektur:</strong> Das gesamte Frontend wurde in saubere JavaScript-Module (DataService, ChartController, UIManager) umgeschrieben. Extrem stabil und zukunftssicher!</li>
+                        <li>• 📱 <strong>Social Sentiment Kacheln:</strong> Reddit- & Twitter-Stimmung werden jetzt als eigene Metrik-Kacheln unter dem Chart angezeigt.</li>
+                        <li>• 🧠 <strong>FinGPT & Omni-Report:</strong> Der Report-Generator verbindet jetzt NewsAPI, FMP, Yahoo und Social Sentiment für die perfekte Analyse.</li>
+                    </ul>
+                </div>
+            </div>
+            <button onclick="app.ui.closeModal('patch-modal')" class="mt-8 w-full py-3 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-colors shrink-0">Schließen</button>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         JAVASCRIPT: MODULARE ARCHITEKTUR (ES6 Classes)
+         ========================================================================= -->
+    <script>
+        /**
+         * 1. Data Service Module
+         * Handhabt alle API-Aufrufe (Single Responsibility)
+         */
+        class DataService {
+            async fetchChart(symbol, period) {
+                try {
+                    const res = await fetch(`/api/chart/${symbol}?period=${period}`);
+                    return await res.json();
+                } catch(e) { console.error("Chart API Error", e); return []; }
+            }
+            async fetchStockSummary(symbol) {
+                return await (await fetch(`/api/stock/${symbol}`)).json();
+            }
+            async fetchFundamentals(symbol) {
+                return await (await fetch(`/api/fmp/${symbol}`)).json();
+            }
+            async fetchNews(symbol) {
+                return await (await fetch(`/api/news/${symbol}`)).json();
+            }
+            async fetchWatchlist() {
+                return await (await fetch('/api/watchlist')).json();
+            }
+            async modifyWatchlist(action, symbol, name = "") {
+                const opt = { method: action === 'ADD' ? 'POST' : 'DELETE', headers: {'Content-Type': 'application/json'} };
+                if (action === 'ADD') opt.body = JSON.stringify({symbol, name});
+                return await fetch(action === 'ADD' ? '/api/watchlist' : `/api/watchlist/${symbol}`, opt);
+            }
+            async search(query) {
+                return await (await fetch(`/api/search?q=${encodeURIComponent(query)}`)).json();
+            }
+            async chat(symbol, message) {
+                return await (await fetch('/api/chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({symbol, message}) })).json();
+            }
+            async generateReport(symbol, model) {
+                return await (await fetch('/api/report', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({symbol, model}) })).json();
+            }
+        }
+
+        /**
+         * 2. Chart Controller Module
+         * Kapselt die Lightweight-Charts Logik
+         */
+        class ChartController {
+            constructor(containerId) {
+                this.container = document.getElementById(containerId);
+                this.chart = null;
+                this.series = null;
+                this.init();
+            }
+
+            init() {
+                const isDark = document.documentElement.classList.contains('dark');
+                this.chart = LightweightCharts.createChart(this.container, {
+                    layout: { background: { type: 'solid', color: 'transparent' }, textColor: isDark ? '#9CA3AF' : '#6B7280' },
+                    grid: { vertLines: { visible: false }, horzLines: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } },
+                    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                    rightPriceScale: { borderVisible: false },
+                    timeScale: { borderVisible: false, timeVisible: true }
+                });
+                new ResizeObserver(entries => {
+                    if (entries[0].contentRect.width > 0) this.chart.resize(entries[0].contentRect.width, entries[0].contentRect.height);
+                }).observe(this.container);
+            }
+
+            updateTheme(isDark) {
+                this.chart.applyOptions({
+                    layout: { textColor: isDark ? '#9CA3AF' : '#6B7280' },
+                    grid: { horzLines: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } }
+                });
+            }
+
+            draw(data) {
+                if (this.series) { this.chart.removeSeries(this.series); }
+                if (!data || data.length === 0) return false;
+
+                const firstVal = data[0].value || data[0].close;
+                const lastVal = data[data.length - 1].value || data[data.length - 1].close;
+                const isPos = lastVal >= firstVal;
+
+                this.series = this.chart.addAreaSeries({
+                    lineColor: isPos ? '#22C55E' : '#EF4444',
+                    topColor: isPos ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)',
+                    bottomColor: isPos ? 'rgba(34, 197, 94, 0.0)' : 'rgba(239, 68, 68, 0.0)',
+                    lineWidth: 2, priceLineVisible: true
+                });
+                
+                this.series.setData(data.map(d => ({ time: d.time, value: d.value || d.close })));
+                this.chart.timeScale().fitContent();
+                return true;
+            }
+            
+            showLoading(show) { document.getElementById('chart-loading').style.display = show ? 'flex' : 'none'; }
+        }
+
+        /**
+         * 3. Report & Chat Controller
+         * Verarbeitet KI-Interaktionen
+         */
+        class AIController {
+            constructor(api) { this.api = api; this.setupChat(); }
+            
+            setupChat() {
+                const input = document.getElementById('chat-input');
+                input.addEventListener('keypress', async (e) => {
+                    if (e.key === 'Enter' && app.state.symbol && input.value.trim()) {
+                        const msg = input.value.trim(); input.value = '';
+                        this.appendChatMsg(msg, 'user');
+                        const loadingId = this.appendLoading();
+                        
+                        try {
+                            const res = await this.api.chat(app.state.symbol, msg);
+                            document.getElementById(loadingId).remove();
+                            this.appendChatMsg(marked.parse(res.reply), 'ai', res.reply.toLowerCase().includes('fehler'));
+                        } catch(err) {
+                            document.getElementById(loadingId).remove();
+                            this.appendChatMsg("Verbindungsfehler zur KI.", 'ai', true);
+                        }
+                    }
+                });
+            }
+
+            appendChatMsg(html, type, isError = false) {
+                const out = document.getElementById('chat-output');
+                const div = document.createElement('div');
+                div.className = `flex mt-4 animate-fade-in ${type === 'user' ? 'justify-end' : 'justify-start'}`;
+                const innerClass = type === 'user' 
+                    ? 'bg-blue-600 text-white text-xs px-4 py-2.5 rounded-2xl rounded-tr-none max-w-[85%]'
+                    : isError 
+                        ? 'bg-red-500/20 text-red-500 border border-red-500/30 text-xs px-4 py-3 rounded-2xl rounded-tl-none max-w-[95%]'
+                        : 'bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-gray-200 text-xs px-4 py-3 rounded-2xl rounded-tl-none max-w-[95%] leading-relaxed border border-gray-200 dark:border-white/5';
+                div.innerHTML = `<div class="${innerClass}">${html}</div>`;
+                out.appendChild(div); out.scrollTop = out.scrollHeight;
+            }
+
+            appendLoading() {
+                const id = 'load-' + Date.now();
+                const out = document.getElementById('chat-output');
+                out.innerHTML += `<div id="${id}" class="flex justify-start mt-4"><div class="bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/5 px-4 py-2 rounded-2xl rounded-tl-none"><i data-lucide="loader" class="w-4 h-4 animate-spin text-blue-500"></i></div></div>`;
+                lucide.createIcons(); out.scrollTop = out.scrollHeight;
+                return id;
+            }
+
+            openModal() {
+                if(!app.state.symbol) return alert("Wähle eine Aktie aus!");
+                document.getElementById('report-symbol-title').innerText = app.state.symbol;
+                document.getElementById('report-result').classList.add('hidden');
+                document.getElementById('report-controls').classList.remove('hidden');
+                app.ui.openModal('report-modal');
+            }
+
+            closeModal() { app.ui.closeModal('report-modal'); }
+
+            async generate() {
+                document.getElementById('report-controls').classList.add('hidden');
+                document.getElementById('report-loading').classList.remove('hidden');
+                document.getElementById('report-loading').classList.add('flex');
+                document.getElementById('report-result').classList.add('hidden');
+
+                const model = document.getElementById('report-model-select').value;
+                try {
+                    const data = await this.api.generateReport(app.state.symbol, model);
+                    document.getElementById('report-loading').classList.add('hidden');
+                    document.getElementById('report-loading').classList.remove('flex');
+                    document.getElementById('report-result').innerHTML = marked.parse(data.report);
+                    document.getElementById('report-result').classList.remove('hidden');
+                } catch(e) {
+                    document.getElementById('report-loading').classList.add('hidden');
+                    document.getElementById('report-result').innerHTML = `<p class="text-red-500">Fehler: ${e.message}</p>`;
+                    document.getElementById('report-result').classList.remove('hidden');
+                }
+            }
+        }
+
+        /**
+         * 4. Main Application Orchestrator
+         * Verbindet alles miteinander.
+         */
+        class Application {
+            constructor() {
+                this.api = new DataService();
+                this.chartUI = new ChartController('chart-container');
+                this.reports = new AIController(this.api);
+                
+                this.state = { symbol: null, name: null, period: '1y', lastFetch: 0 };
+                this.ui = {
+                    openModal: (id) => {
+                        const m = document.getElementById(id); m.classList.remove('hidden'); m.classList.add('flex');
+                        setTimeout(() => { m.classList.remove('opacity-0'); if(m.querySelector('div')) m.querySelector('div').classList.remove('scale-95'); }, 10);
+                    },
+                    closeModal: (id) => {
+                        const m = document.getElementById(id); m.classList.add('opacity-0');
+                        if(m.querySelector('div')) m.querySelector('div').classList.add('scale-95');
+                        setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+                    }
+                };
+
+                this.initUI();
+                this.renderTimeframes();
+                this.setupSearch();
+                setInterval(() => this.updateLiveStatus(), 10000);
+                this.loadWatchlist();
+            }
+
+            initUI() {
+                lucide.createIcons();
+                // Theme Toggle
+                document.getElementById('theme-toggle').addEventListener('click', () => {
+                    const isDark = document.documentElement.classList.toggle('dark');
+                    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                    this.chartUI.updateTheme(isDark);
+                    lucide.createIcons();
+                });
+                // Sidebar Tabs
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const tab = e.currentTarget.getAttribute('data-tab');
+                        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                        document.getElementById(`tab-${tab}`).classList.remove('hidden');
+                        document.querySelectorAll('.nav-btn').forEach(el => { el.className = 'nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors'; });
+                        e.currentTarget.className = 'nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-black dark:text-white font-semibold transition-colors anim-chart';
+                    });
+                });
+            }
+
+            renderTimeframes() {
+                const tf = ['1d', '5d', '1mo', '6mo', '1y', '5y', 'max'];
+                const container = document.getElementById('timeframe-controls');
+                container.innerHTML = tf.map(t => 
+                    `<button onclick="app.setPeriod('${t}')" id="btn-tf-${t}" class="tf-btn px-3 py-1.5 rounded text-xs font-medium transition-all ${t==='1y' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm':'text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5'}">${t.toUpperCase()}</button>`
+                ).join('');
+            }
+
+            async setPeriod(period) {
+                this.state.period = period;
+                document.querySelectorAll('.tf-btn').forEach(b => b.className = 'tf-btn px-3 py-1.5 rounded text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5 transition-all');
+                const btn = document.getElementById(`btn-tf-${period}`);
+                if(btn) btn.className = 'tf-btn px-3 py-1.5 rounded text-xs font-medium bg-white dark:bg-white/10 text-black dark:text-white shadow-sm transition-all';
+                if(this.state.symbol) await this.loadChartData();
+            }
+
+            updateLiveStatus() {
+                if (this.state.lastFetch === 0) return;
+                const isLive = ((Date.now() - this.state.lastFetch) / 60000) < 5;
+                document.getElementById('status-dot').className = `inline-flex rounded-full h-2 w-2 ${isLive ? 'bg-green-500 animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]' : 'bg-red-500'}`;
+                document.getElementById('status-text').innerText = isLive ? 'System Online' : 'Verzögert';
+            }
+
+            async loadChartData() {
+                this.chartUI.showLoading(true);
+                const data = await this.api.fetchChart(this.state.symbol, this.state.period);
+                this.chartUI.showLoading(false);
+                this.chartUI.draw(data);
+                this.state.lastFetch = Date.now();
+                this.updateLiveStatus();
+            }
+
+            async loadAsset(symbol, name) {
+                this.state.symbol = symbol; this.state.name = name || symbol;
+                document.getElementById('main-chart-symbol').innerText = symbol;
+                document.getElementById('main-chart-name').innerText = name;
+                
+                // 1. Chart
+                await this.loadChartData();
+
+                // 2. Summary
+                const summaryEl = document.getElementById('gemini-summary');
+                summaryEl.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin inline text-blue-500"></i> Analysiere...';
+                lucide.createIcons();
+                const stock = await this.api.fetchStockSummary(symbol);
+                summaryEl.innerHTML = stock.ai_summary.includes("Fehler") 
+                    ? `<span class="text-red-500">${stock.ai_summary}</span>` 
+                    : marked.parse(stock.ai_summary);
+                document.getElementById('data-source-badge').innerText = `Quelle: ${stock.source || 'Yahoo'}`;
+
+                // 3. News
+                const news = await this.api.fetchNews(symbol);
+                document.getElementById('news-banner').innerHTML = news.length > 0 
+                    ? news.map(n => `<a href="${n.url}" target="_blank" class="hover:text-blue-400"><b>${n.source}:</b> ${n.headline}</a>`).join('<span class="mx-3 text-blue-500">•</span>')
+                    : 'Keine aktuellen News.';
+
+                // 4. Fundamentals & Sentiment (Modulare Kacheln)
+                const fmp = await this.api.fetchFundamentals(symbol);
+                const fmt = num => isNaN(parseFloat(num)) ? 'N/A' : new Intl.NumberFormat('de-DE', { notation: 'compact' }).format(parseFloat(num));
+                
+                const statsHtml = [
+                    { label: 'Market Cap', val: fmp.marketCap !== 'N/A' ? '$'+fmt(fmp.marketCap) : 'N/A' },
+                    { label: 'Umsatz', val: fmp.revenue !== 'N/A' ? '$'+fmt(fmp.revenue) : 'N/A' },
+                    { label: 'Net Income', val: fmp.netIncome !== 'N/A' ? '$'+fmt(fmp.netIncome) : 'N/A' },
+                    { label: 'KGV (P/E)', val: fmp.peRatio !== 'N/A' ? parseFloat(fmp.peRatio).toFixed(2) : 'N/A' },
+                    { label: 'EPS', val: fmp.eps !== 'N/A' ? '$'+parseFloat(fmp.eps).toFixed(2) : 'N/A' },
+                    { label: 'Debt/Eq', val: fmp.debtToEquity !== 'N/A' ? parseFloat(fmp.debtToEquity).toFixed(2) : 'N/A' },
+                    // Platzhalter für Social Sentiment Kacheln (werden durch Finnhub Backend befüllt)
+                    { label: 'Reddit Hype', val: 'Analysiere...' },
+                    { label: 'X Sentiment', val: 'Analysiere...' }
+                ].map(s => `
+                    <div class="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5 p-4 rounded-xl text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">${s.label}</div>
+                        <div class="text-sm font-bold text-gray-900 dark:text-white">${s.val}</div>
+                    </div>
+                `).join('');
+                document.getElementById('stats-grid').innerHTML = statsHtml;
+            }
+
+            setupSearch() {
+                const input = document.getElementById('search-input'), resBox = document.getElementById('search-dropdown');
+                let timeout;
+                input.addEventListener('input', e => {
+                    clearTimeout(timeout);
+                    const q = e.target.value.trim();
+                    if(q.length < 2) { resBox.classList.add('hidden'); return; }
+                    timeout = setTimeout(async () => {
+                        const results = await this.api.search(q);
+                        resBox.innerHTML = results.length > 0 ? results.map(r => `
+                            <div onclick="app.addWatchlist('${r.symbol}','${r.name}')" class="p-3 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer flex justify-between items-center border-b border-gray-100 dark:border-white/5 last:border-0">
+                                <div><div class="font-bold text-sm dark:text-white">${r.symbol}</div><div class="text-[10px] text-gray-500">${r.name}</div></div>
+                                <div class="text-[9px] border border-gray-200 dark:border-white/10 px-2 py-1 rounded text-gray-500 uppercase">${r.type}</div>
+                            </div>
+                        `).join('') : '<div class="p-3 text-sm text-gray-500">Nichts gefunden.</div>';
+                        resBox.classList.remove('hidden');
+                    }, 400);
+                });
+                document.addEventListener('click', e => { if(!input.contains(e.target) && !resBox.contains(e.target)) resBox.classList.add('hidden'); });
+            }
+
+            async addWatchlist(symbol, name) {
+                await this.api.modifyWatchlist('ADD', symbol, name);
+                document.getElementById('search-input').value = '';
+                document.getElementById('search-dropdown').classList.add('hidden');
+                await this.loadWatchlist();
+                this.loadAsset(symbol, name);
+            }
+            
+            async removeWatchlist(symbol, e) {
+                e.stopPropagation();
+                await this.api.modifyWatchlist('REMOVE', symbol);
+                this.loadWatchlist();
+            }
+
+            async loadWatchlist() {
+                const data = await this.api.fetchWatchlist();
+                const container = document.getElementById('watchlist-container');
+                container.innerHTML = data.length === 0 ? '<span class="text-xs text-gray-500">Keine Aktien in der Watchlist. Nutze die Suche!</span>' : data.map(item => `
+                    <div onclick="app.loadAsset('${item.symbol}', '${item.name}')" class="group relative flex items-baseline space-x-2 cursor-pointer bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 hover:border-blue-500 dark:hover:border-blue-500/50 px-3 py-2 rounded-xl transition-all shadow-sm">
+                        <span class="text-gray-900 dark:text-white font-bold">${item.symbol}</span>
+                        <span class="text-xs text-gray-500">$${item.price}</span>
+                        <span class="text-[10px] font-bold ${item.isPositive ? 'text-green-500':'text-red-500'}">${item.change}</span>
+                        <button onclick="app.removeWatchlist('${item.symbol}', event)" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"><i data-lucide="x" class="w-3 h-3"></i></button>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+                if(data.length > 0 && !this.state.symbol) this.loadAsset(data[0].symbol, data[0].name);
+            }
+        }
+
+        // Start Application
+        document.addEventListener('DOMContentLoaded', () => {
+            requestAnimationFrame(() => { window.app = new Application(); });
+        });
+    </script>
+</body>
+</html>

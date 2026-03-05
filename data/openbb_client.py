@@ -1,205 +1,227 @@
+import os
 import time
-import hashlib
-import json
 import requests
 import pandas as pd
-import os
-import yfinance as yf
-from functools import wraps
+import sqlite3
 from loguru import logger
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from openbb import obb # Das Herzstück
 
 load_dotenv()
-_cache_store: dict = {}
-
-def cached(ttl_seconds: int = 300):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            key_parts = [func.__name__, str(args), str(kwargs)]
-            key = hashlib.md5(json.dumps(key_parts, sort_keys=True, default=str).encode()).hexdigest()
-            if key in _cache_store:
-                val, exp = _cache_store[key]
-                if time.time() < exp:
-                    return val
-            try:
-                res = func(*args, **kwargs)
-                if res is not None:
-                    _cache_store[key] = (res, time.time() + ttl_seconds)
-                return res
-            except Exception as e:
-                logger.error(f"Error in {func.__name__}: {e}")
-                return None
-        return wrapper
-    return decorator
-
-
-def _flatten_yf_columns(df: pd.DataFrame) -> pd.DataFrame:
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.columns = [str(c).strip().lower() for c in df.columns]
-    return df
-
 
 class OpenBBClient:
+    """
+    Der God-Mode OpenBB Hub. 
+    Kombiniert OpenBB (Charts, Makro, Fundamentals) mit 
+    Finnhub (Analysten, Sentiment, Social Media).
+    """
     def __init__(self):
-        self.fmp_key = os.getenv("FMP_API_KEY", "")
         self.finnhub_key = os.getenv("FINNHUB_API_KEY", "")
-        self.headers = {'User-Agent': 'Mozilla/5.0'}
+        
+        # Pfad zur lokalen Asset-DB für die Ticker-Übersetzung
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.db_path = os.path.join(base_dir, "master_assets.db")
 
-    def search_ticker(self, query: str) -> list:
-        # Sucht Aktien, ETFs und akzeptiert ISINs (Yahoo Finance mappt ISINs automatisch)
-        if not query: return []
-        results = []
+    def _resolve_ticker(self, ticker: str) -> str:
+        """Übersetzt den Ticker für OpenBB (z.B. hängt '.DE' an für europäische Werte)."""
+        ticker = ticker.upper()
+        if not os.path.exists(self.db_path):
+            return ticker
         try:
-            url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=10"
-            data = requests.get(url, headers=self.headers, timeout=4).json()
-            for item in data.get('quotes', []):
-                # Akzeptiere EQUITY und ETFs
-                if item.get('quoteType') in ['EQUITY', 'ETF', 'MUTUALFUND']:
-                    type_str = "ETF" if item.get('quoteType') != 'EQUITY' else "Aktie"
-                    results.append({
-                        "ticker": item['symbol'], 
-                        "name": item.get('shortname') or item.get('longname'),
-                        "type": type_str
-                    })
-        except: pass
-        return results
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT full_ticker FROM assets WHERE symbol = ? OR full_ticker = ? LIMIT 1", (ticker, ticker))
+                row = cursor.fetchone()
+                return row[0] if row else ticker
+        except:
+            return ticker
 
-    @cached(ttl_seconds=300)
-    def get_price_history(self, ticker: str, period: str = "1y", interval: str = "1d") -> tuple:
-        """Chart Daten: Yahoo Finance -> Finnhub -> FMP"""
-        df = pd.DataFrame()
-        source = ""
-        req_cols = ["open", "high", "low", "close", "volume"]
+    # ------------------------------------------------------------------------
+    # 1. KERN-DATEN (Preise, Charts, Makro via OpenBB)
+    # ------------------------------------------------------------------------
 
-        # Intervall-Logik für Yahoo
-        yf_interval = "1d"
-        if period in ["1d", "5d"]: yf_interval = "5m"
-        elif period == "1mo": yf_interval = "1h"
-
-        # 1. YAHOO FINANCE
+    def get_price_history(self, ticker: str, period: str = "1y"):
+        full_ticker = self._resolve_ticker(ticker)
         try:
-            t = yf.Ticker(ticker)
-            df_yf = t.history(period=period, interval=yf_interval, auto_adjust=True)
-
-            if df_yf is not None and not df_yf.empty:
-                df_yf = _flatten_yf_columns(df_yf)
-                if all(col in df_yf.columns for col in req_cols):
-                    df = df_yf[req_cols].copy().dropna()
-                    df.index = pd.to_datetime(df.index).tz_localize(None)
-                    source = "Yahoo Finance"
+            df = obb.equity.price.historical(symbol=full_ticker, provider="yfinance").to_df()
+            if not df.empty:
+                df.columns = [str(c).lower() for c in df.columns]
+                return df, "OpenBB"
         except Exception as e:
-            logger.error(f"[CHART YAHOO ERROR] {ticker}: {e}")
+            logger.debug(f"OpenBB History fehlgeschlagen für {ticker}: {e}")
 
-        # 2. FINNHUB Fallback (nur Daily/1y)
-        if df.empty and self.finnhub_key and period == "1y":
+        if self.finnhub_key:
             try:
                 end_ts = int(time.time())
-                start_ts = end_ts - (365 * 24 * 3600)
+                start_ts = end_ts - (365 * 24 * 3600) 
                 url = f"https://finnhub.io/api/v1/stock/candle?symbol={ticker}&resolution=D&from={start_ts}&to={end_ts}&token={self.finnhub_key}"
                 resp = requests.get(url, timeout=5).json()
-
-                if resp.get("s") == "ok" and resp.get("t"):
+                if resp.get("s") == "ok":
                     df = pd.DataFrame({
                         "open": resp["o"], "high": resp["h"], "low": resp["l"],
                         "close": resp["c"], "volume": resp["v"]
                     }, index=pd.to_datetime(resp["t"], unit="s"))
                     df.index.name = "date"
-                    df = df.sort_index(ascending=True)
-                    source = "Finnhub"
+                    return df.sort_index(ascending=True), "Finnhub"
             except: pass
+        return pd.DataFrame(), "Error"
 
-        # 3. FMP Fallback (nur Daily/1y)
-        if df.empty and self.fmp_key and period == "1y":
-            try:
-                url = f"https://financialmodelingprep.com/stable/historical-price-full?symbol={ticker}&apikey={self.fmp_key}"
-                resp = requests.get(url, timeout=5).json()
-                if "historical" in resp and len(resp["historical"]) > 0:
-                    df = pd.DataFrame(resp["historical"])
-                    df['date'] = pd.to_datetime(df['date'])
-                    df.set_index('date', inplace=True)
-                    df = df.sort_index(ascending=True)
-                    df = df.tail(252)
-                    df = df[req_cols]
-                    source = "FMP"
-            except: pass
-
-        return df, source
-
-    @cached(ttl_seconds=60)
     def get_quote(self, ticker: str) -> dict:
-        result = {"price": 0, "change": 0, "change_pct": 0, "name": ticker, "pe_ratio": "N/A", "source": "Unbekannt"}
+        full_ticker = self._resolve_ticker(ticker)
         try:
-            t = yf.Ticker(ticker)
-            fi = t.fast_info
-            price = fi.last_price
-            prev = fi.previous_close
-            if price and prev:
-                result["price"] = price
-                result["change"] = price - prev
-                result["change_pct"] = (price - prev) / prev
-                result["source"] = "Yahoo Finance"
-            i = t.info
-            if i:
-                result["name"] = i.get("shortName", ticker)
-                result["pe_ratio"] = i.get("trailingPE", "N/A")
+            res_df = obb.equity.price.quote(symbol=full_ticker, provider="yfinance").to_df()
+            if not res_df.empty:
+                row = res_df.iloc[0]
+                return {
+                    "price": row.get("last_price", 0),
+                    "change": row.get("change", 0),
+                    "change_pct": (row.get("percent_change", 0) / 100) if row.get("percent_change") else 0,
+                    "name": full_ticker,
+                    "source": "OpenBB"
+                }
         except: pass
-
-        if result["price"] == 0 and self.finnhub_key:
-            try:
-                url_q = f"https://finnhub.io/api/v1/quote?symbol={ticker}&token={self.finnhub_key}"
-                resp_q = requests.get(url_q, timeout=3).json()
-                if "c" in resp_q and resp_q["c"] != 0:
-                    result["price"] = resp_q.get("c", 0)
-                    result["change"] = resp_q.get("d", 0)
-                    result["change_pct"] = (resp_q.get("dp", 0) / 100) if resp_q.get("dp") else 0
-                    result["source"] = "Finnhub"
-            except: pass
-
-        if result["pe_ratio"] in [None, "N/A", ""] and self.finnhub_key:
-            try:
-                url_m = f"https://finnhub.io/api/v1/stock/metric?symbol={ticker}&metric=all&token={self.finnhub_key}"
-                resp_m = requests.get(url_m, timeout=3).json()
-                if "metric" in resp_m:
-                    pe = resp_m["metric"].get("peNormalizedAnnual", "N/A")
-                    if pe not in [None, "N/A", ""]:
-                        result["pe_ratio"] = pe
-            except: pass
-
-        if result["pe_ratio"] is None: result["pe_ratio"] = "N/A"
-        if isinstance(result["pe_ratio"], (int, float)): result["pe_ratio"] = round(result["pe_ratio"], 2)
-        return result
-
-    @cached(ttl_seconds=600)
-    def get_news(self, ticker: str) -> list:
-        """Holt News von Finnhub."""
-        if not self.finnhub_key: return []
-        try:
-            to_date = datetime.now().strftime("%Y-%m-%d")
-            from_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-            url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={to_date}&token={self.finnhub_key}"
-            resp = requests.get(url, timeout=5).json()
             
-            news_list = []
-            if isinstance(resp, list):
-                for n in resp[:10]: # Top 10 News
-                    # Filter für englische/deutsche Sprache (Finnhub ist primär EN)
-                    news_list.append({
-                        "headline": n.get("headline", ""),
-                        "source": n.get("source", "News"),
-                        "url": n.get("url", "#"),
-                        "summary": n.get("summary", ""),
-                        "datetime": datetime.fromtimestamp(n.get("datetime", time.time())).strftime("%d.%m.%Y %H:%M")
-                    })
-            return news_list
-        except Exception as e:
-            logger.error(f"[NEWS FEHLER] {e}")
-            return []
+        if self.finnhub_key:
+            try:
+                url = f"https://finnhub.io/api/v1/quote?symbol={ticker.split('.')[0]}&token={self.finnhub_key}"
+                resp = requests.get(url, timeout=3).json()
+                if "c" in resp and resp["c"] != 0:
+                    return {
+                        "price": resp.get("c", 0),
+                        "change": resp.get("d", 0),
+                        "change_pct": (resp.get("dp", 0) / 100) if resp.get("dp") else 0,
+                        "name": ticker,
+                        "source": "Finnhub"
+                    }
+            except: pass
+        return {"price": 0, "change": 0, "change_pct": 0, "name": ticker, "source": "None"}
 
-    def get_financials(self, ticker: str): return {}
-    def get_analyst_info(self, ticker: str): return {}
+    def get_macro_data(self, series_id: str = "FEDFUNDS"):
+        try:
+            return obb.economy.fred_series(symbol=series_id).to_df()
+        except:
+            return pd.DataFrame()
+
+    def get_company_metrics(self, ticker: str):
+        try:
+            return obb.equity.fundamental.metrics(symbol=self._resolve_ticker(ticker), provider="yfinance").to_df()
+        except:
+            return pd.DataFrame()
+
+    def search_ticker(self, query: str) -> list:
+        """
+        Premium-Suche: Sucht lokal nach ISIN/Name/Ticker. 
+        Wenn nicht genug gefunden wird, greift die Live-Suche von Finnhub für 100% globale Abdeckung (Asien, Kanada, ETFs etc.).
+        """
+        results = []
+        q = f"%{query.upper()}%"
+        
+        # 1. Lokale DB Suche (Rasend schnell, enthält ISIN & Börse)
+        if os.path.exists(self.db_path):
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.row_factory = sqlite3.Row
+                    cursor = conn.cursor()
+                    # Suche in Ticker, Name oder ISIN
+                    cursor.execute("""
+                        SELECT full_ticker, name, type, isin, exchange_code 
+                        FROM assets 
+                        WHERE full_ticker LIKE ? OR name LIKE ? OR isin LIKE ? 
+                        LIMIT 8
+                    """, (q, q, q))
+                    
+                    for r in cursor.fetchall():
+                        results.append({
+                            "ticker": r["full_ticker"], 
+                            "name": r["name"], 
+                            "type": r["type"],
+                            "isin": r["isin"] if r["isin"] else "",
+                            "exchange": r["exchange_code"] if r["exchange_code"] else "US"
+                        })
+            except Exception as e:
+                logger.error(f"DB Search Error: {e}")
+
+        # 2. FINNHUB LIVE-SUCHE (Der God-Mode Fallback für exotische Märkte & ETFs)
+        if len(results) < 5 and self.finnhub_key:
+            try:
+                url = f"https://finnhub.io/api/v1/search?q={query}&token={self.finnhub_key}"
+                resp = requests.get(url, timeout=3).json()
+                if "result" in resp:
+                    for item in resp["result"]:
+                        # Vermeide Duplikate, falls wir den Ticker schon lokal gefunden haben
+                        if not any(r["ticker"] == item["symbol"] for r in results):
+                            results.append({
+                                "ticker": item["symbol"],
+                                "name": item["description"],
+                                "type": item["type"],
+                                "isin": "", # Finnhub Live liefert keine ISIN in der Kurzübersicht
+                                "exchange": "Global / " + (item["type"] or "Asset")
+                            })
+            except Exception as e:
+                logger.debug(f"Finnhub Search Error: {e}")
+
+        # Gib maximal die besten 10 Ergebnisse zurück
+        return results[:10]
+
+    # ------------------------------------------------------------------------
+    # 2. ALTERNATIVE DATEN (Analysten & Sentiment via FINNHUB) -> NEU!
+    # ------------------------------------------------------------------------
+
+    def get_analyst_ratings(self, ticker: str) -> dict:
+        """Holt die aktuellen Wallstreet Analysten-Empfehlungen (Buy/Hold/Sell)."""
+        if not self.finnhub_key: return {}
+        try:
+            # Finnhub braucht den reinen US Ticker, ohne Suffixe wie .DE
+            clean_ticker = ticker.split('.')[0]
+            url = f"https://finnhub.io/api/v1/stock/recommendation?symbol={clean_ticker}&token={self.finnhub_key}"
+            resp = requests.get(url, timeout=3).json()
+            if resp and isinstance(resp, list) and len(resp) > 0:
+                # Wir nehmen den aktuellsten Monat (Index 0)
+                latest = resp[0]
+                return {
+                    "strongBuy": latest.get("strongBuy", 0),
+                    "buy": latest.get("buy", 0),
+                    "hold": latest.get("hold", 0),
+                    "sell": latest.get("sell", 0),
+                    "strongSell": latest.get("strongSell", 0)
+                }
+        except Exception as e:
+            logger.warning(f"Konnte Analysten-Ratings für {ticker} nicht laden: {e}")
+        return {}
+
+    def get_news_sentiment(self, ticker: str) -> dict:
+        """Analysiert die Stimmung (bullish/bearish) der Nachrichten der letzten Woche."""
+        if not self.finnhub_key: return {}
+        try:
+            clean_ticker = ticker.split('.')[0]
+            url = f"https://finnhub.io/api/v1/news-sentiment?symbol={clean_ticker}&token={self.finnhub_key}"
+            resp = requests.get(url, timeout=3).json()
+            if "sentiment" in resp:
+                return {
+                    "bullishPercent": resp["sentiment"].get("bullishPercent", 0.5),
+                    "bearishPercent": resp["sentiment"].get("bearishPercent", 0.5),
+                    "score": resp.get("companyNewsScore", 0.5) # 0 bis 1 (1 ist super positiv)
+                }
+        except: pass
+        return {}
+
+    def get_insider_sentiment(self, ticker: str) -> dict:
+        """Prüft, ob Vorstände (Insider) aktuell eher kaufen oder verkaufen."""
+        if not self.finnhub_key: return {}
+        try:
+            clean_ticker = ticker.split('.')[0]
+            url = f"https://finnhub.io/api/v1/stock/insider-sentiment?symbol={clean_ticker}&from=2024-01-01&to=2026-12-31&token={self.finnhub_key}"
+            resp = requests.get(url, timeout=3).json()
+            if "data" in resp and len(resp["data"]) > 0:
+                # Summiere die "MSPR" (Management Sentiment Score) der letzten Monate
+                total_score = sum([item.get("mspr", 0) for item in resp["data"]])
+                avg_score = total_score / len(resp["data"])
+                return {
+                    "score": avg_score,
+                    "trend": "Kaufen" if avg_score > 0 else ("Verkaufen" if avg_score < 0 else "Neutral")
+                }
+        except: pass
+        return {}
 
 _client = None
 def get_client():

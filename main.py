@@ -1,405 +1,208 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from contextlib import asynccontextmanager
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 import os
-import json
-import requests
+import time
 import pandas as pd
 from dotenv import load_dotenv
 from loguru import logger
 
+# Lade Umgebungsvariablen (API-Keys etc.)
 load_dotenv()
 
+# Importiere unsere spezialisierten Module (Die "Gehirne" hinter den Endpunkten)
 from data.openbb_client import get_client
-from data.fingpt_client import get_fingpt_client, AVAILABLE_MODELS
 from services.omni_data_service import get_omni_service
 from services.technical_analysis_service import get_technical_analysis_service
-from services.screener_service import get_screener_service
+from services.screener_service import ScreenerService
 from services.portfolio_service import get_portfolio_service
-from data.cache_manager import get_cache, TTL
 
+# --- API Konfiguration ---
+app = FastAPI(
+    title="AI-Terminal God-Mode API",
+    description="Zentrale Schnittstelle für globale Marktdaten, KI-Analysen und Screening.",
+    version="0.3.5"
+)
+
+# CORS-Einstellungen für das Frontend (Dashboard)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Service Initialisierung ---
+# Wir laden die Instanzen einmalig beim Start
+market_client = get_client()
 omni_service = get_omni_service()
 tech_service = get_technical_analysis_service()
-screener_service = get_screener_service()
+screener_service = ScreenerService()
 portfolio_service = get_portfolio_service()
-cache        = get_cache()
 
-# ── Pydantic Models ───────────────────────────────────────────────────────────
-class WatchlistItem(BaseModel):
-    symbol: str
-    name: str
-
+# --- Pydantic Modelle (Sicherstellung valider Daten-Inputs) ---
 class ChatMessage(BaseModel):
-    symbol: str
-    message: str
+    symbol: str = Field(..., example="AAPL")
+    message: str = Field(..., example="Wie ist die aktuelle Stimmung?")
     model: str = "mistralai/Mistral-7B-Instruct-v0.3"
 
 class OmniAnalyzeRequest(BaseModel):
     symbol: str
-    model:  str = "mistralai/Mistral-7B-Instruct-v0.3"
-    focus:  str = "full"
-
-class ReportRequest(BaseModel):
-    symbol: str
-    model:  str = "mistralai/Mistral-7B-Instruct-v0.3"
-
-# NEU v4.0:
-class OmniMultiAgentRequest(BaseModel):
-    symbol: str
-    model:  str = "mistralai/Mistral-7B-Instruct-v0.3"
+    model: str = "mistralai/Mistral-7B-Instruct-v0.3"
 
 class ScreenerRequest(BaseModel):
-    universe: str
-    filters: dict = {}
+    sector: Optional[str] = None
+    asset_type: str = "Common Stock"
+    limit: int = 10
+
+class TechnicalRequest(BaseModel):
+    symbol: str
+    period: str = "1y"
+
+class PortfolioPosition(BaseModel):
+    symbol: str
+    shares: float
+    avg_price: float
 
 class PortfolioRequest(BaseModel):
-    positions: list[dict]
+    positions: List[PortfolioPosition]
 
-# ── Watchlist Helpers ─────────────────────────────────────────────────────────
-WATCHLIST_FILE = "watchlist.json"
-DEFAULT_WATCHLIST = [
-    {"symbol": "AAPL", "name": "Apple Inc."},
-    {"symbol": "MSFT", "name": "Microsoft Corp."},
-    {"symbol": "NVDA", "name": "NVIDIA Corp."},
-    {"symbol": "RHM.DE", "name": "Rheinmetall AG"}
-]
-
-def load_watchlist_data():
-    if not os.path.exists(WATCHLIST_FILE):
-        with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_WATCHLIST, f, indent=4)
-        return DEFAULT_WATCHLIST
-    try:
-        with open(WATCHLIST_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return DEFAULT_WATCHLIST
-
-def save_watchlist_data(data):
-    with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-
-# ── Lifespan ──────────────────────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("[STARTUP] Lade Watchlist-Cache vor...")
-    try:
-        for item in load_watchlist_data():
-            client.get_quote(item["symbol"])
-    except Exception as e:
-        logger.warning(f"[STARTUP] {e}")
-    yield
-
-# ── App Setup ─────────────────────────────────────────────────────────────────
-app = FastAPI(title="AI-Analyst Backend v4.0 – God-Mode", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
-                   allow_methods=["*"], allow_headers=["*"])
-
-client    = get_client()
-ai_client = get_fingpt_client()
-
-# ═════════════════════════════════════════════════════════════════════════════
-# BESTEHENDE ENDPUNKTE (v3.1) - Unverändert für das Dashboard!
-# ═════════════════════════════════════════════════════════════════════════════
+# --- API Endpunkte ---
 
 @app.get("/")
-def serve_frontend():
-    return FileResponse(os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html"))
-
-@app.get("/api/models")
-def get_models():
-    return AVAILABLE_MODELS
-
-@app.get("/api/watchlist")
-def get_watchlist():
+async def serve_index():
+    """Serviert das Haupt-Interface des Terminals."""
+    # Macht den Pfad absolut, egal von wo das Skript gestartet wird
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    index_path = os.path.join(base_dir, "index.html")
     
-    data = []
-           
-    for item in load_watchlist_data():
-        t = item["symbol"]
-        if t == "UNDEFINED" or not t: continue # Ignoriere fehlerhafte Einträge
-        
-        quote = client.get_quote(t)
-        if quote and quote.get("price", 0) > 0:
-            change_pct = quote.get("change_pct", 0) * 100
-            data.append({
-                "symbol": t,
-                "name": item.get("name", quote.get("name", t)),
-                "price": f"{quote.get('price', 0):.2f}",
-                "change": f"{'+' if change_pct > 0 else ''}{change_pct:.2f}%",
-                "isPositive": change_pct > 0
-            })
-    return data
-
-@app.post("/api/watchlist")
-def add_to_watchlist(item: WatchlistItem):
-    
-    if not item.symbol or item.symbol.upper() == "UNDEFINED":
-        return {"status": "error", "message": "Ungültiges Symbol"}
-        
-    items = load_watchlist_data()
-    if not any(i["symbol"] == item.symbol.upper() for i in items):
-        items.append({"symbol": item.symbol.upper(), "name": item.name})
-        save_watchlist_data(items)
-    return {"status": "success"}
-
-@app.delete("/api/watchlist/{symbol}")
-def remove_from_watchlist(symbol: str):
-    save_watchlist_data([i for i in load_watchlist_data() if i["symbol"] != symbol.upper()])
-    return {"status": "success"}
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    raise HTTPException(status_code=404, detail=f"index.html nicht gefunden unter: {index_path}")
 
 @app.get("/api/search")
-def search_ticker(q: str = ""):
-    if not q: return []
-    return [{"symbol": r["ticker"], "name": r["name"], "type": r.get("type", "Aktie")}
-            for r in client.search_ticker(q)]
-
-@app.get("/api/chart/{symbol}")
-def get_chart_data(symbol: str, period: str = "1y"):
-    result = client.get_price_history(symbol, period=period)
-    if result is None: return []
-    df, source = result
-    if df is None or df.empty: return []
-    df = df.dropna(subset=["open","high","low","close"])
-    df = df[~df.index.duplicated(keep="last")].sort_index()
-    is_intraday = period in ["1d","5d","1mo"]
-    out = []
-    for date, row in df.iterrows():
-        try:
-            out.append({"time": int(date.timestamp()) if is_intraday else date.strftime("%Y-%m-%d"),
-                        "open": round(float(row["open"]),2), "high": round(float(row["high"]),2),
-                        "low": round(float(row["low"]),2),   "close": round(float(row["close"]),2),
-                        "value": round(float(row["close"]),2)})
-        except: continue
-    return out
-
-@app.get("/api/stock/{symbol}")
-def get_stock(symbol: str):
-    quote      = client.get_quote(symbol)
-    price      = quote.get("price", 0)
-    change_pct = quote.get("change_pct", 0) * 100
+async def search_assets(q: str):
+    """
+    Sucht nach Tickern. 
+    Nutzt zuerst die lokale master_assets.db (Meilenstein 1) für maximale Geschwindigkeit.
+    """
+    logger.info(f"Suche nach: {q}")
     try:
-        ai_summary = ai_client.ask(
-            f"Aktie: {symbol} | Preis: ${price:.2f} | Tagesänderung: {change_pct:+.2f}% | "
-            f"KGV: {quote.get('pe_ratio','N/A')}\n"
-            f"Schreibe eine prägnante 2-Satz Einschätzung zu dieser Aktie auf Deutsch.")
+        return market_client.search_ticker(q)
     except Exception as e:
-        ai_summary = f"{symbol} notiert bei ${price:.2f} ({change_pct:+.2f}%). KI nicht verfügbar: {str(e)[:80]}"
-    return {"symbol": symbol.upper(), "ai_summary": ai_summary,
-            "recommendation": "KAUFEN" if change_pct > 0 else "BEOBACHTEN",
-            "source": quote.get("source","Unbekannt")}
+        logger.error(f"Fehler bei der Suche: {e}")
+        return []
 
-@app.get("/api/news/{symbol}")
-def get_news(symbol: str):
-    return client.get_news(symbol)
+@app.get("/api/quote")
+def quote(symbol: str):
+    """Holt die aktuellen Preisdaten."""
+    from data.openbb_client import get_client
+    return get_client().get_quote(symbol)
+
+# --- NEU: Endpunkt für Alternative Daten (Finnhub) ---
+@app.get("/api/sentiment")
+def get_asset_sentiment(symbol: str):
+    """Holt Analysten-Ratings, News-Stimmung und Insider-Trades via Finnhub."""
+    from data.openbb_client import get_client
+    client = get_client()
+    return {
+        "analyst": client.get_analyst_ratings(symbol),
+        "news": client.get_news_sentiment(symbol),
+        "insider": client.get_insider_sentiment(symbol)
+    }
+
+# --- NEU: Der Data Orchestrator Endpunkt ---
+@app.get("/api/orchestrator/profile")
+def get_orchestrator_profile(symbol: str):
+    """
+    Der Master-Endpunkt: Holt Bilanzen, Cashflows, Sentiment und Quotes 
+    als ein massives, RAG-optimiertes JSON-Paket.
+    """
+    from services.data_orchestrator import get_orchestrator
+    return get_orchestrator().get_full_profile(symbol)
+# -------------------------------------------
+
+@app.post("/api/analyze/omni")
+def analyze_omni(req: OmniAnalyzeRequest):
+        return {"error": "KI-Analyse fehlgeschlagen."}
 
 @app.post("/api/chat")
-def chat_with_ai(chat: ChatMessage):
+async def ai_chat_interaction(req: ChatMessage):
+    """Verarbeitet Chat-Anfragen an den KI-Analysten."""
     try:
-        quote = client.get_quote(chat.symbol)
-        reply = ai_client.ask(
-            f"Aktie: {chat.symbol} | Preis: ${quote.get('price','?')} | "
-            f"KGV: {quote.get('pe_ratio','N/A')} | "
-            f"Tagesänderung: {quote.get('change_pct',0)*100:+.2f}%\n\nNutzerfrage: {chat.message}",
-            model_id=chat.model)
-        return {"reply": reply, "model_used": chat.model}
+        response = omni_service.chat(req.symbol, req.message)
+        return response
     except Exception as e:
-        return {"reply": f"FinGPT-Fehler: {str(e)}"}
+        logger.error(f"Chat-Fehler: {e}")
+        return {"reply": "Entschuldigung, ich habe gerade Verbindungsprobleme."}
 
-@app.get("/api/fmp/{symbol}")
-def get_fmp_data(symbol: str):
-    fmp_key     = os.getenv("FMP_API_KEY","")
-    finnhub_key = os.getenv("FINNHUB_API_KEY","")
-    d = {"revenue":"N/A","netIncome":"N/A","eps":"N/A","peRatio":"N/A",
-         "marketCap":"N/A","debtToEquity":"N/A","source":"Unbekannt"}
-    ok = False
-    if fmp_key:
-        try:
-            inc = requests.get(f"https://financialmodelingprep.com/stable/income-statement?symbol={symbol}&limit=1&apikey={fmp_key}",timeout=5).json()
-            met = requests.get(f"https://financialmodelingprep.com/stable/key-metrics?symbol={symbol}&limit=1&apikey={fmp_key}",timeout=5).json()
-            if isinstance(inc,list) and inc:
-                m = met[0] if isinstance(met,list) and met else {}
-                d.update({"revenue":inc[0].get("revenue","N/A"),"netIncome":inc[0].get("netIncome","N/A"),
-                          "eps":inc[0].get("eps","N/A"),"peRatio":m.get("peRatio","N/A"),
-                          "marketCap":m.get("marketCap","N/A"),"debtToEquity":m.get("debtToEquity","N/A"),"source":"FMP"})
-                ok = True
-        except: pass
-    if finnhub_key and (not ok or d["peRatio"] in [None,"N/A",""]):
-        try:
-            fh = requests.get(f"https://finnhub.io/api/v1/stock/metric?symbol={symbol}&metric=all&token={finnhub_key}",timeout=3).json().get("metric",{})
-            if fh:
-                if d["peRatio"] in [None,"N/A",""]:     d["peRatio"]      = fh.get("peNormalizedAnnual","N/A")
-                if d["eps"] in [None,"N/A",""]:          d["eps"]          = fh.get("epsTrailingTwelveMonths","N/A")
-                if d["marketCap"] in [None,"N/A",""]:
-                    mc = fh.get("marketCapitalization")
-                    d["marketCap"] = mc*1_000_000 if mc else "N/A"
-                if d["debtToEquity"] in [None,"N/A",""]: d["debtToEquity"] = fh.get("totalDebt/totalEquityAnnual","N/A")
-                d["source"] = "FMP & Finnhub" if ok else "Finnhub"
-        except: pass
-    if d["source"] == "Unbekannt":
-        try:
-            import yfinance as yf
-            i = yf.Ticker(symbol).info
-            d.update({"revenue":i.get("totalRevenue","N/A"),"netIncome":i.get("netIncomeToCommon","N/A"),
-                      "eps":i.get("trailingEps","N/A"),"peRatio":i.get("trailingPE","N/A"),
-                      "marketCap":i.get("marketCap","N/A"),
-                      "debtToEquity":(i.get("debtToEquity")/100 if i.get("debtToEquity") else "N/A"),
-                      "source":"Yahoo Finance"})
-        except: pass
-    for k,v in d.items():
-        if v is None: d[k] = "N/A"
-    return d
-
-@app.post("/api/report")
-def generate_report(req: ReportRequest):
-    return omni_analyze(OmniAnalyzeRequest(symbol=req.symbol, model=req.model, focus="full"))
-
-@app.get("/api/omni/{symbol}")
-def get_omni_bundle(symbol: str):
-    key    = f"omni:{symbol.upper()}"
-    cached = cache.get(key)
-    if cached: return cached
-    bundle = omni_service.get_bundle(symbol)
-    cache.set(key, bundle, ttl=TTL["screener"])
-    return bundle
-
-@app.post("/api/omni/analyze")
-def omni_analyze(req: OmniAnalyzeRequest):
-    key    = f"omni_report:{req.symbol.upper()}:{req.model}:{req.focus}"
-    cached = cache.get(key)
-    if cached: return cached
-
-    bundle = omni_service.get_bundle(req.symbol)
-    prompt = omni_service.build_llm_prompt(bundle, analysis_focus=req.focus)
-
-    try:
-        report = ai_client.ask(prompt, model_id=req.model)
-    except Exception as e:
-        logger.error(f"[OmniAnalyze] {e}")
-        report = f"**KI temporär nicht verfügbar.**\n\nFehler: {str(e)}"
-
-    result = {
-        "symbol":     req.symbol.upper(),
-        "report":     report,
-        "bundle":     bundle,
-        "prompt_len": len(prompt),
-        "timestamp":  bundle.get("timestamp"),
-        "errors":     bundle.get("errors",[]),
-    }
-    cache.set(key, result, ttl=900)
-    return result
-
-@app.get("/api/reddit/{symbol}")
-def get_reddit_sentiment(symbol: str):
-    key = f"reddit:{symbol.upper()}"
-    c   = cache.get(key)
-    if c: return c
-    from data.reddit_client import get_reddit_client
-    result = get_reddit_client().get_ticker_sentiment(symbol)
-    cache.set(key, result, ttl=600)
-    return result
-
-@app.get("/api/trends/{symbol}")
-def get_google_trends(symbol: str):
-    key = f"trends:{symbol.upper()}"
-    c   = cache.get(key)
-    if c: return c
-    from data.trends_client import get_trends_client
-    result = get_trends_client().get_interest(symbol)
-    cache.set(key, result, ttl=3600)
-    return result
-
-@app.get("/api/sec/{symbol}")
-def get_sec_data(symbol: str):
-    key = f"sec:{symbol.upper()}"
-    c   = cache.get(key)
-    if c: return c
-    from data.sec_client import get_sec_client
-    s      = get_sec_client()
-    result = {"insider_summary": s.get_insider_summary(symbol),
-              "recent_filings":  s.get_recent_filings(symbol)}
-    cache.set(key, result, ttl=3600)
-    return result
-
-@app.get("/api/signals")
-def get_market_signals():
-    key = "global_signals"
-    c   = cache.get(key)
-    if c: return c
-    from data.signals_client import get_signals_client
-    s      = get_signals_client()
-    result = {"fear_greed": s.get_fear_greed(), "macro": s.get_macro_signals()}
-    cache.set(key, result, ttl=300)
-    return result
-
-@app.get("/api/signals/{symbol}")
-def get_stock_signals(symbol: str):
-    key = f"signals:{symbol.upper()}"
-    c   = cache.get(key)
-    if c: return c
-    from data.signals_client import get_signals_client
-    s      = get_signals_client()
-    result = {"earnings":       s.get_earnings_calendar(symbol),
-              "analyst":        s.get_analyst_ratings(symbol),
-              "news_sentiment": s.get_news_sentiment(symbol)}
-    cache.set(key, result, ttl=TTL["screener"])
-    return result
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# NEU v4.0: GOD-MODE ENDPUNKTE (Multi-Agent, Chart Overlays, Screener, Portfolio)
-# ═════════════════════════════════════════════════════════════════════════════
-
-@app.post("/api/omni/multi-agent")
-def omni_multi_agent_analyze(req: OmniMultiAgentRequest):
-    """Führt das asynchrone Multi-Agenten System aus (Parallel KI)."""
-    bundle = omni_service.get_bundle(req.symbol)
-    report = omni_service.run_multi_agent_analysis(bundle, ai_client, req.model)
-    return {"symbol": req.symbol.upper(), "report": report}
-
-@app.get("/api/technical/{symbol}")
-def get_technical_data(symbol: str):
-    """Liefert Zeitreihen für Chart-Overlays (SMA, BB) und aktuelle Signale."""
-    df = tech_service.get_price_data(symbol, period="1y")
-    if df.empty: return {"chart_data": [], "analysis": {}}
+@app.post("/api/technical")
+async def run_ta_scan(req: TechnicalRequest):
+    """Berechnet Indikatoren (SMA, RSI, MACD) auf Basis historischer Daten."""
+    logger.debug(f"Technischer Scan: {req.symbol} ({req.period})")
+    df, source = market_client.get_price_history(req.symbol, req.period)
     
-    # Chart formatieren für Lightweight Charts UI
+    if df.empty:
+        return {"error": "Keine historischen Daten verfügbar."}
+    
+    # Aufbereitung der Chart-Daten für Lightweight Charts
     chart_data = []
-    for date, row in df.iterrows():
+    for idx, row in df.iterrows():
         chart_data.append({
-            "time": date.strftime("%Y-%m-%d"),
-            "sma_20": round(row.get('sma_20', 0), 2) if pd.notna(row.get('sma_20')) else None,
-            "sma_50": round(row.get('sma_50', 0), 2) if pd.notna(row.get('sma_50')) else None,
-            "bb_upper": round(row.get('bb_upper', 0), 2) if pd.notna(row.get('bb_upper')) else None,
-            "bb_lower": round(row.get('bb_lower', 0), 2) if pd.notna(row.get('bb_lower')) else None,
+            "time": idx.strftime("%Y-%m-%d"),
+            "open": round(row["open"], 2),
+            "high": round(row["high"], 2),
+            "low": round(row["low"], 2),
+            "close": round(row["close"], 2)
         })
     
+    # Berechnung der technischen Indikatoren über den Service
     analysis = tech_service.analyze_indicators(df)
-    return {"chart_data": chart_data, "analysis": analysis}
+    
+    return {
+        "symbol": req.symbol,
+        "source": source,
+        "chart_data": chart_data,
+        "analysis": analysis
+    }
 
 @app.post("/api/screener")
-def run_screener(req: ScreenerRequest):
-    """Nutzt den Screener Service mit Finnhub."""
-    df = screener_service.run_screen(req.universe, req.filters)
-    # NaN zu None für JSON Parsing
-    df = df.where(pd.notnull(df), None)
-    return df.to_dict(orient="records")
+async def run_global_screener(req: ScreenerRequest):
+    """Filtert die globale Datenbank nach den besten Investment-Chancen."""
+    logger.info(f"Screener Scan gestartet: {req.asset_type}")
+    try:
+        results = screener_service.get_recommendations(
+            sector=req.sector,
+            asset_type=req.asset_type,
+            limit=req.limit
+        )
+        return results
+    except Exception as e:
+        logger.error(f"Screener-Fehler: {e}")
+        return {"error": "Screener konnte nicht ausgeführt werden."}
+
+@app.get("/api/screener/stats")
+async def get_database_metrics():
+    """Gibt Einblick in die Größe der lokalen master_assets.db."""
+    return screener_service.get_global_stats()
 
 @app.post("/api/portfolio/analyze")
-def analyze_portfolio(req: PortfolioRequest):
-    """Berechnet Sharpe, VaR, Max Drawdown für das Portfolio."""
-    res = portfolio_service.get_full_analytics(req.positions)
-    # Wir brauchen keine täglichen Returns im JSON an die UI (zu groß)
-    if "daily_returns" in res: del res["daily_returns"]
-    if "cum_returns" in res: del res["cum_returns"]
-    if "cum_benchmark" in res: del res["cum_benchmark"]
-    if "correlation" in res and res["correlation"] is not None:
-        res["correlation"] = res["correlation"].to_dict()
-    return res
-
+async def run_portfolio_risk_check(req: PortfolioRequest):
+    """Analysiert Klumpenrisiken und Performance im Portfolio."""
+    logger.info(f"Portfolio-Analyse für {len(req.positions)} Positionen")
+    try:
+        # Konvertiere Pydantic Modelle in einfache Liste für den Service
+        pos_list = [p.dict() for p in req.positions]
+        analytics = portfolio_service.get_full_analytics(pos_list)
+        return analytics
+    except Exception as e:
+        logger.error(f"Portfolio-Fehler: {e}")
+        return {"error": "Analyse fehlgeschlagen."}
 
 if __name__ == "__main__":
     import uvicorn
+    logger.info("Starte Terminal-Server auf http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)

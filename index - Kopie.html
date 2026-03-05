@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Analyst God-Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+        if (localStorage.getItem('theme') === 'light') document.documentElement.classList.remove('dark');
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: background-color 0.3s, color 0.3s; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .sleek-scroll::-webkit-scrollbar { width: 5px; }
+        .sleek-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sleek-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.4); border-radius:10px; }
+        .marquee-container { display:flex; overflow:hidden; width:100%; }
+        .animate-marquee { animation: marquee 90s linear infinite; white-space:nowrap; padding-left:100%; }
+        .animate-marquee:hover { animation-play-state:paused; }
+        @keyframes marquee { 0%{transform:translateX(0%)} 100%{transform:translateX(-100%)} }
+        @keyframes slideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+        .animate-slide-in { animation: slideIn 0.4s ease-out forwards; }
+        .animate-fade-in  { animation: fadeIn  0.3s ease-in  forwards; }
+        .prose h3 { font-size:1.1rem; font-weight:700; margin-top:1.5em; margin-bottom:0.5em; color:#3b82f6; }
+        .prose p  { margin-bottom:1em; line-height:1.6; }
+        .prose ul { list-style-type:disc; padding-left:1.5em; margin-bottom:1em; }
+        .prose strong { color: inherit; }
+    </style>
+</head>
+<body class="bg-white dark:bg-[#050505] text-gray-900 dark:text-gray-100 h-screen flex overflow-hidden">
+
+<!-- ═══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
+<aside class="w-64 border-r border-gray-200 dark:border-white/10 flex flex-col bg-gray-50/50 dark:bg-[#0a0a0a] z-20">
+    <div class="p-5">
+        <div class="flex items-center p-2.5 bg-white/40 dark:bg-white/5 rounded-xl border border-gray-200/50 dark:border-white/5 shadow-sm">
+            <div class="flex items-center justify-center w-8 h-8 mr-3 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg">
+                <i data-lucide="orbit" class="w-5 h-5 animate-[spin_10s_linear_infinite]"></i>
+            </div>
+            <h1 class="text-lg font-bold tracking-tight">
+                God<span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500 ml-0.5">Mode</span>
+                <span class="text-[9px] font-normal text-gray-400 ml-1">v4.0</span>
+            </h1>
+        </div>
+    </div>
+    <nav class="flex-1 px-4 space-y-2 mt-2" id="sidebar-nav">
+        <button data-tab="terminal" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-black dark:text-white font-semibold transition-colors">
+            <i data-lucide="activity" class="w-4 h-4"></i><span>Terminal</span>
+        </button>
+        <button data-tab="screener" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+            <i data-lucide="filter" class="w-4 h-4"></i><span>Sektor Screener</span>
+        </button>
+        <button data-tab="portfolio" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+            <i data-lucide="pie-chart" class="w-4 h-4"></i><span>Risk Analytics</span>
+        </button>
+    </nav>
+    <div class="mt-auto p-6 border-t border-gray-200 dark:border-white/10 text-xs text-gray-500 space-y-3">
+        <button onclick="app.ui.openModal('patch-modal')" class="text-left hover:text-black dark:hover:text-white transition-colors flex items-center font-medium">
+            <i data-lucide="file-text" class="w-3 h-3 mr-2"></i> Patch Notes v4.0
+        </button>
+        <span class="opacity-75 block text-purple-400 font-bold"><i data-lucide="bot" class="w-3 h-3 inline mr-1"></i>Multi-Agent Engine</span>
+        <span class="opacity-75 block">10+ Datenquellen parallel</span>
+    </div>
+</aside>
+
+<!-- ═══ MAIN ═══════════════════════════════════════════════════════════════════ -->
+<main class="flex-1 flex flex-col h-screen overflow-hidden">
+
+    <!-- Header -->
+    <header class="h-16 border-b border-gray-200 dark:border-white/10 flex items-center justify-between px-8 shrink-0 z-50">
+        <div class="flex items-center w-full max-w-md relative">
+            <i data-lucide="search" class="w-4 h-4 text-gray-400 mr-3 shrink-0"></i>
+            <input id="search-input" type="text" placeholder="Ticker suchen (z.B. AAPL, NVDA, SAP.DE)..." autocomplete="off"
+                class="bg-transparent border-none focus:outline-none text-sm w-full placeholder-gray-400">
+            <div id="search-dropdown" class="absolute top-full left-0 mt-3 w-full bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl hidden flex-col max-h-64 overflow-y-auto z-50 sleek-scroll"></div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2 bg-gray-100 dark:bg-white/5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/5">
+                <span id="status-dot" class="inline-flex rounded-full h-2 w-2 bg-green-500 animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]"></span>
+                <span id="status-text" class="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">System Online</span>
+            </div>
+            <button id="theme-toggle" class="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-all text-gray-600 dark:text-gray-400">
+                <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+                <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Scroll Area -->
+    <div class="flex-1 overflow-y-auto p-8 no-scrollbar relative">
+
+        <!-- ═══ TAB: TERMINAL ════════════════════════════════════════════════ -->
+        <div id="tab-terminal" class="tab-content space-y-8">
+
+            <!-- Watchlist + News Banner -->
+            <div class="flex flex-col space-y-4">
+                <div id="watchlist-container" class="flex flex-wrap items-center gap-3 no-scrollbar overflow-x-auto pb-1">
+                    <span class="text-xs text-gray-400">Lade Watchlist...</span>
+                </div>
+                <div class="marquee-container bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg py-3 px-5 items-center relative">
+                    <div class="flex items-center text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mr-6 shrink-0 bg-blue-50/80 dark:bg-[#0a0a0a] pr-4">
+                        <i data-lucide="rss" class="w-4 h-4 mr-2 animate-pulse"></i> Live Feed
+                    </div>
+                    <div class="flex-1 overflow-hidden relative h-5">
+                        <div id="news-banner" class="absolute top-0 left-0 h-full flex items-center animate-marquee text-sm text-gray-600 dark:text-gray-400 space-x-12">
+                            <span>Wähle eine Aktie – der Omni-Data Stream startet automatisch...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart + Chat Grid -->
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+
+                <!-- Chart -->
+                <div class="xl:col-span-2 flex flex-col space-y-4 animate-slide-in">
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <div class="flex items-center gap-3">
+                                <h2 id="main-chart-symbol" class="text-4xl font-bold tracking-tight">—</h2>
+                                <span id="tech-signal-badge" class="hidden text-xs font-bold px-3 py-1 rounded-full bg-blue-500/20 text-blue-500 border border-blue-500/30">Lade Signal...</span>
+                            </div>
+                            <p id="main-chart-name" class="text-sm text-gray-500 mt-1">Wähle ein Asset</p>
+                        </div>
+                        <div class="flex flex-col items-end gap-2">
+                            <!-- Technical Overlays Toggles -->
+                            <div class="flex space-x-2 text-[10px] font-bold">
+                                <button onclick="app.toggleOverlay('sma')" id="btn-ov-sma" class="px-2 py-1 rounded border border-gray-200 dark:border-white/10 text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-all">SMA 20/50</button>
+                                <button onclick="app.toggleOverlay('bb')" id="btn-ov-bb" class="px-2 py-1 rounded border border-gray-200 dark:border-white/10 text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-all">B-Bands</button>
+                            </div>
+                            <!-- Timeframes -->
+                            <div id="timeframe-controls" class="flex space-x-1 bg-gray-100 dark:bg-white/5 p-1 rounded-lg border border-gray-200 dark:border-white/5"></div>
+                        </div>
+                    </div>
+                    <div id="chart-container" class="h-[380px] w-full bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl relative overflow-hidden shadow-inner">
+                        <div id="chart-loading" class="absolute inset-0 flex-col items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm z-10 hidden">
+                            <i data-lucide="loader-2" class="w-8 h-8 text-blue-500 animate-spin mb-3"></i>
+                            <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Synchronisiere Marktdaten...</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center pt-1">
+                        <span id="data-source-badge" class="text-[10px] uppercase tracking-wider text-gray-500 bg-gray-100 dark:bg-white/5 px-3 py-1 rounded-full border border-gray-200 dark:border-white/10">Quelle: —</span>
+                        <div class="flex gap-3">
+                            <button onclick="app.omni.openRawPanel()" class="flex items-center px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-semibold text-sm transition-all hover:scale-105">
+                                <i data-lucide="database" class="w-4 h-4 mr-2"></i> Rohdaten
+                            </button>
+                            <button onclick="app.reports.openModal()" class="flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.5)] font-bold text-sm transition-all hover:scale-105">
+                                <i data-lucide="network" class="w-4 h-4 mr-2"></i> Multi-Agent Analyse
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat -->
+                <div class="flex flex-col h-[480px] bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-sm animate-slide-in" style="animation-delay:0.1s">
+                    <div class="p-4 border-b border-gray-100 dark:border-white/10 flex items-center bg-gray-50/50 dark:bg-transparent">
+                        <div class="relative">
+                            <i data-lucide="bot" class="w-5 h-5 mr-3 text-purple-500"></i>
+                            <span class="absolute bottom-0 right-2 w-2 h-2 bg-green-500 rounded-full border-2 border-white dark:border-[#111]"></span>
+                        </div>
+                        <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Terminal Assistant</span>
+                    </div>
+                    <div id="chat-output" class="flex-1 overflow-y-auto p-5 space-y-4 text-sm sleek-scroll">
+                        <div class="text-center text-gray-400 text-xs mt-10">Stelle dem KI-Analysten Fragen zur aktuellen Aktie oder zum Markt.</div>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 dark:border-white/10">
+                        <input id="chat-input" type="text" placeholder="Prompt eingeben (Enter)..."
+                            class="w-full bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 dark:text-white transition-all shadow-inner">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ OMNI-DATA INTELLIGENCE DASHBOARD ══════════════════════ -->
+            <div class="pt-6 border-t border-gray-200 dark:border-white/10 animate-slide-in" style="animation-delay:0.2s">
+                <div class="flex items-center justify-between mb-5">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center">
+                        <i data-lucide="globe" class="w-4 h-4 mr-2 text-purple-500"></i> Omni-Data Intelligence
+                    </h3>
+                    <div class="flex items-center gap-2 text-[10px] text-gray-400">
+                        <span id="omni-status-dot" class="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+                        <span id="omni-status-text">Wähle eine Aktie</span>
+                    </div>
+                </div>
+
+                <!-- Fundamentals Row -->
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-4" id="stats-grid">
+                    <!-- populated by JS -->
+                </div>
+
+                <!-- Sentiment Row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+
+                    <!-- Reddit Card -->
+                    <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center">
+                                <span class="text-orange-500 font-black mr-2 text-base">r/</span>Reddit Sentiment
+                            </span>
+                            <span id="reddit-label" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-white/10 text-gray-500">—</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <div class="text-center p-2 bg-green-50 dark:bg-green-500/10 rounded-xl">
+                                <div id="reddit-bullish" class="text-xl font-black text-green-600 dark:text-green-400">—</div>
+                                <div class="text-[9px] text-gray-500 uppercase tracking-wider">Bullish</div>
+                            </div>
+                            <div class="text-center p-2 bg-red-50 dark:bg-red-500/10 rounded-xl">
+                                <div id="reddit-bearish" class="text-xl font-black text-red-500">—</div>
+                                <div class="text-[9px] text-gray-500 uppercase tracking-wider">Bearish</div>
+                            </div>
+                        </div>
+                        <div id="reddit-breakdown" class="text-[10px] text-gray-500 space-y-1"></div>
+                    </div>
+
+                    <!-- Fear & Greed + Makro Card -->
+                    <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4">
+                        <div class="flex items-center mb-3 text-xs font-bold text-gray-700 dark:text-gray-300">
+                            <i data-lucide="gauge" class="w-4 h-4 mr-2 text-yellow-500"></i> Market Pulse
+                        </div>
+                        <div class="flex items-center justify-center mb-3">
+                            <div class="relative w-20 h-20">
+                                <svg viewBox="0 0 36 36" class="w-20 h-20 -rotate-90">
+                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(156,163,175,0.2)" stroke-width="3"/>
+                                    <circle id="fg-arc" cx="18" cy="18" r="15.9" fill="none" stroke="#3b82f6"
+                                        stroke-width="3" stroke-dasharray="0 100" stroke-linecap="round"
+                                        class="transition-all duration-1000"/>
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span id="fg-value" class="text-xl font-black">—</span>
+                                    <span id="fg-emoji" class="text-lg">❓</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center text-xs font-bold mb-2" id="fg-label">Fear &amp; Greed</div>
+                        <div class="grid grid-cols-3 gap-1" id="macro-mini"></div>
+                    </div>
+
+                    <!-- Google Trends Card -->
+                    <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center">
+                                <i data-lucide="trending-up" class="w-4 h-4 mr-2 text-blue-500"></i> Google Trends
+                            </span>
+                            <span id="trends-direction" class="text-[10px] font-bold text-gray-500">—</span>
+                        </div>
+                        <div class="flex items-end gap-0.5 h-14 mb-3" id="trends-sparkline"></div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div>
+                                <div id="trends-current" class="text-lg font-black">—</div>
+                                <div class="text-[9px] text-gray-500">Aktuell</div>
+                            </div>
+                            <div>
+                                <div id="trends-peak" class="text-lg font-black">—</div>
+                                <div class="text-[9px] text-gray-500">Peak</div>
+                            </div>
+                            <div>
+                                <div id="trends-avg" class="text-lg font-black">—</div>
+                                <div class="text-[9px] text-gray-500">Ø 90d</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Signals Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <!-- Earnings -->
+                    <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4">
+                        <div class="flex items-center mb-3 text-xs font-bold text-gray-700 dark:text-gray-300">
+                            <i data-lucide="calendar" class="w-4 h-4 mr-2 text-purple-500"></i> Earnings
+                        </div>
+                        <div id="earnings-card" class="space-y-2 text-xs text-gray-400">Lade...</div>
+                    </div>
+
+                    <!-- Analyst -->
+                    <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4">
+                        <div class="flex items-center mb-3 text-xs font-bold text-gray-700 dark:text-gray-300">
+                            <i data-lucide="users" class="w-4 h-4 mr-2 text-indigo-500"></i> Analyst Konsensus
+                        </div>
+                        <div id="analyst-card" class="space-y-2 text-xs text-gray-400">Lade...</div>
+                    </div>
+
+                    <!-- News Sentiment -->
+                    <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4">
+                        <div class="flex items-center mb-3 text-xs font-bold text-gray-700 dark:text-gray-300">
+                            <i data-lucide="newspaper" class="w-4 h-4 mr-2 text-green-500"></i> News Sentiment
+                        </div>
+                        <div id="news-sentiment-card" class="space-y-2 text-xs text-gray-400">Lade...</div>
+                    </div>
+
+                    <!-- SEC Insider -->
+                    <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4">
+                        <div class="flex items-center mb-3 text-xs font-bold text-gray-700 dark:text-gray-300">
+                            <i data-lucide="landmark" class="w-4 h-4 mr-2 text-amber-500"></i> SEC Insider
+                        </div>
+                        <div id="insider-card" class="space-y-2 text-xs text-gray-400">Lade...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: SCREENER ════════════════════════════════════════════════ -->
+        <div id="tab-screener" class="tab-content hidden h-full flex flex-col animate-fade-in">
+            <div class="flex items-center mb-6">
+                <i data-lucide="filter" class="w-8 h-8 text-blue-500 mr-4"></i>
+                <div>
+                    <h2 class="text-3xl font-bold">Finnhub Sektor Screener</h2>
+                    <p class="text-gray-500 text-sm">Finde Momentum-Aktien und Value-Plays auf Basis harter Metriken.</p>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-5 mb-6 flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Universum</label>
+                    <select id="screen-universe" class="bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                        <option value="mega_cap_us">US Mega Caps</option>
+                        <option value="dax_40">DAX 40</option>
+                        <option value="tech_growth">Tech Growth</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Max P/E (KGV)</label>
+                    <input type="number" id="screen-pe" placeholder="z.B. 30" class="w-24 bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Min. RSI (Momentum)</label>
+                    <input type="number" id="screen-rsi" placeholder="z.B. 40" class="w-24 bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button onclick="app.runScreener()" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors flex items-center shadow-lg">
+                    <i data-lucide="search" class="w-4 h-4 mr-2"></i> Screenen
+                </button>
+            </div>
+
+            <div class="flex-1 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-inner relative">
+                <div id="screener-loading" class="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-10 hidden flex-col items-center justify-center">
+                    <i data-lucide="loader" class="w-8 h-8 text-blue-500 animate-spin mb-2"></i>
+                    <span class="text-xs font-bold">Analysiere Finnhub Daten...</span>
+                </div>
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-50 dark:bg-white/5 text-gray-500 text-xs uppercase font-bold">
+                        <tr>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">Ticker</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">Preis</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">Trend</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">P/E Ratio</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10">Tech Score</th>
+                            <th class="px-6 py-4 border-b border-gray-200 dark:border-white/10 text-right">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="screener-results" class="divide-y divide-gray-100 dark:divide-white/5">
+                        <tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">Wähle Filter und starte den Screener.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: PORTFOLIO ═══════════════════════════════════════════════ -->
+        <div id="tab-portfolio" class="tab-content hidden h-full flex flex-col animate-fade-in">
+            <div class="flex justify-between items-end mb-6">
+                <div class="flex items-center">
+                    <i data-lucide="pie-chart" class="w-8 h-8 text-purple-500 mr-4"></i>
+                    <div>
+                        <h2 class="text-3xl font-bold">Risk & Portfolio Analytics</h2>
+                        <p class="text-gray-500 text-sm">Professionelle Risikobewertung (Sharpe, Drawdown, VaR).</p>
+                    </div>
+                </div>
+                <button onclick="app.portfolio.addMockPosition()" class="text-xs text-purple-500 font-bold hover:underline">Mock-Daten laden</button>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6" id="portfolio-stats">
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Total Return</div><div class="text-xl font-black">—</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Sharpe Ratio</div><div class="text-xl font-black">—</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Max Drawdown</div><div class="text-xl font-black">—</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">Value at Risk (95%)</div><div class="text-xl font-black">—</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold">vs S&P 500</div><div class="text-xl font-black">—</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-[400px]">
+                <!-- Positionen -->
+                <div class="lg:col-span-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl flex flex-col overflow-hidden">
+                    <div class="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-[#0a0a0a] flex justify-between items-center">
+                        <span class="font-bold text-sm">Deine Positionen</span>
+                        <div class="flex gap-2">
+                            <input type="text" id="port-ticker" placeholder="Ticker" class="w-20 text-xs px-2 py-1 rounded border dark:bg-black dark:border-white/20">
+                            <input type="number" id="port-qty" placeholder="Anzahl" class="w-20 text-xs px-2 py-1 rounded border dark:bg-black dark:border-white/20">
+                            <button onclick="app.portfolio.addPosition()" class="bg-purple-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-purple-500">+</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-4 sleek-scroll">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-xs text-gray-500"><tr><th>Ticker</th><th>Shares</th><th>Aktion</th></tr></thead>
+                            <tbody id="portfolio-positions-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 dark:border-white/10">
+                        <button onclick="app.portfolio.analyze()" class="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg transition-all flex justify-center items-center">
+                            <i data-lucide="activity" class="w-4 h-4 mr-2"></i> Portfolio analysieren
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sektor Allokation -->
+                <div class="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-5 flex flex-col">
+                    <h3 class="font-bold text-sm mb-4 border-b border-gray-100 dark:border-white/10 pb-2">Sektor Allokation</h3>
+                    <div id="portfolio-sectors" class="space-y-4 flex-1">
+                        <div class="text-gray-500 text-xs text-center mt-10">Keine Daten berechnet.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- ═══ MODAL: MULTI-AGENT KI ANALYSE ══════════════════════════════════════ -->
+<div id="report-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] hidden items-center justify-center opacity-0 transition-opacity">
+    <div class="modal-inner bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl scale-95 transition-all duration-300">
+        <div class="p-6 border-b border-gray-200 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5 rounded-t-2xl relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-50"></div>
+            <div class="relative z-10">
+                <h2 class="text-2xl font-black flex items-center">
+                    <i data-lucide="network" class="mr-3 text-blue-500"></i>
+                    Multi-Agent Intelligence
+                </h2>
+                <p class="text-sm text-gray-500 mt-1 font-mono" id="report-symbol-title">Warte auf Target...</p>
+            </div>
+            <button onclick="app.reports.closeModal()" class="relative z-10 p-2 bg-gray-200 dark:bg-white/10 rounded-full hover:bg-red-500 hover:text-white transition-colors text-gray-500">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="p-4 border-b border-gray-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-4" id="report-controls">
+            <div class="flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Modell:</span>
+                    <select id="report-model-select" class="bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm dark:text-white focus:ring-2 focus:ring-blue-500">
+                        <option value="mistralai/Mistral-7B-Instruct-v0.3">Mistral 7B (Fast)</option>
+                        <option value="HuggingFaceH4/zephyr-7b-beta">Zephyr 7B</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="app.reports.generate()" class="px-8 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all hover:scale-105 shadow-[0_0_15px_rgba(168,85,247,0.4)] flex items-center">
+                <i data-lucide="zap" class="w-4 h-4 mr-2"></i> Agenten starten
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-8 relative sleek-scroll">
+            
+            <!-- Agent Progress Matrix -->
+            <div id="report-loading" class="hidden flex-col items-center justify-center h-full space-y-8 w-full max-w-2xl mx-auto">
+                <h3 class="font-black text-xl mb-4 text-center w-full">Initialisiere Agenten-Netzwerk...</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                    <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10 text-center relative overflow-hidden">
+                        <div id="agent-fund-loader" class="absolute bottom-0 left-0 h-1 bg-blue-500 w-0 transition-all duration-1000"></div>
+                        <i data-lucide="building-2" class="w-8 h-8 text-blue-500 mx-auto mb-2"></i>
+                        <div class="text-xs font-bold uppercase">Fundamental Agent</div>
+                        <div id="agent-fund-status" class="text-[10px] text-gray-500 mt-1">Liest SEC Filings...</div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10 text-center relative overflow-hidden">
+                        <div id="agent-tech-loader" class="absolute bottom-0 left-0 h-1 bg-orange-500 w-0 transition-all duration-1000"></div>
+                        <i data-lucide="line-chart" class="w-8 h-8 text-orange-500 mx-auto mb-2"></i>
+                        <div class="text-xs font-bold uppercase">Technical Agent</div>
+                        <div id="agent-tech-status" class="text-[10px] text-gray-500 mt-1">Analysiert Indikatoren...</div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10 text-center relative overflow-hidden">
+                        <div id="agent-sent-loader" class="absolute bottom-0 left-0 h-1 bg-green-500 w-0 transition-all duration-1000"></div>
+                        <i data-lucide="messages-square" class="w-8 h-8 text-green-500 mx-auto mb-2"></i>
+                        <div class="text-xs font-bold uppercase">Sentiment Agent</div>
+                        <div id="agent-sent-status" class="text-[10px] text-gray-500 mt-1">Scrapt r/wallstreetbets...</div>
+                    </div>
+                </div>
+                <div class="w-full flex items-center justify-center mt-6 opacity-50" id="chief-agent-box">
+                    <i data-lucide="brain-circuit" class="w-10 h-10 text-purple-500 mr-4 animate-pulse"></i>
+                    <div>
+                        <div class="text-sm font-bold">Chief Analyst</div>
+                        <div class="text-xs text-gray-500">Wartet auf Agenten-Reports...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="report-result" class="prose dark:prose-invert max-w-none hidden text-gray-800 dark:text-gray-300 mx-auto"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MODAL: RAW BUNDLE JSON ═══════════════════════════════════════════════ -->
+<div id="raw-panel-modal" class="fixed inset-0 bg-black/70 backdrop-blur-md z-[300] hidden items-center justify-center opacity-0 transition-opacity">
+    <div class="modal-inner bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl scale-95 transition-all duration-300">
+        <div class="p-5 border-b border-gray-200 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5 rounded-t-2xl">
+            <div>
+                <h2 class="text-xl font-bold flex items-center">
+                    <i data-lucide="database" class="mr-3 text-purple-500"></i>
+                    Omni-Data Rohdaten
+                </h2>
+                <p class="text-xs text-gray-500 mt-1">Dieser Datensatz wird direkt als Kontext ans LLM übergeben</p>
+            </div>
+            <button onclick="app.ui.closeModal('raw-panel-modal')" class="p-2 bg-gray-200 dark:bg-white/10 rounded-full hover:bg-red-500 hover:text-white transition-colors text-gray-500">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 sleek-scroll">
+            <pre id="omni-raw-json" class="text-xs bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-4 whitespace-pre-wrap text-gray-700 dark:text-gray-300 overflow-x-auto">Lade...</pre>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MODAL: PATCH NOTES ════════════════════════════════════════════════════ -->
+<div id="patch-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] hidden items-center justify-center opacity-0 transition-opacity">
+    <div class="modal-inner bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 p-8 rounded-3xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[80vh] scale-95 transition-all duration-300">
+        <h2 class="text-2xl font-bold mb-6 shrink-0 flex items-center justify-between">
+            <span>System Update</span>
+            <span class="text-xs font-bold bg-purple-500 text-white px-3 py-1 rounded-full">God-Mode v4.0</span>
+        </h2>
+        <div class="space-y-6 text-sm text-gray-600 dark:text-gray-400 overflow-y-auto sleek-scroll pr-2 flex-1">
+            <div>
+                <h3 class="text-black dark:text-white font-bold mb-3 text-base">v4.0 – God-Mode & Multi-Agent Engine</h3>
+                <ul class="space-y-2">
+                    <li>• 🧠 <strong>Multi-Agent KI</strong> – 3 Sub-Agenten analysieren Fundamentals, Technik und Sentiment. Ein "Chief Analyst" orchestriert den finalen Report.</li>
+                    <li>• 📊 <strong>Chart Overlays</strong> – SMA 20/50 und Bollinger Bänder per Knopfdruck live in den Chart laden (Berechnet aus dem Backend).</li>
+                    <li>• 🔭 <strong>Finnhub Sektor Screener</strong> – Filter ganze Universen (DAX, Tech, Mega Caps) nach KGV und technischem Momentum (RSI).</li>
+                    <li>• 💼 <strong>Portfolio Analytics</strong> – Berechne echte Risikometriken (Sharpe Ratio, Value at Risk, Max Drawdown) und Sektor-Allokation für deine Positionen.</li>
+                    <li>• 🌐 <strong>Omni-Dashboard</strong> – Alle 10 Datenquellen (Reddit, Trends, Fear & Greed, SEC Insider) sind weiterhin parallel aktiv im Terminal!</li>
+                </ul>
+            </div>
+        </div>
+        <button onclick="app.ui.closeModal('patch-modal')" class="mt-8 w-full py-3 bg-gray-100 dark:bg-white/10 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-colors shrink-0">Schließen</button>
+    </div>
+</div>
+
+<!-- ═══ JAVASCRIPT ════════════════════════════════════════════════════════════ -->
+<script>
+// ────────────────────────────────────────────────────────────────────────────
+// 1. DATA SERVICE – alle API-Calls an einem Ort
+// ────────────────────────────────────────────────────────────────────────────
+class DataService {
+    async _get(url)           { return (await fetch(url)).json(); }
+    async _post(url, body)    { return (await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json(); }
+
+    fetchChart(sym, period)   { return this._get(`/api/chart/${sym}?period=${period}`); }
+    fetchTechnical(sym)       { return this._get(`/api/technical/${sym}`); }
+    fetchStockSummary(sym)    { return this._get(`/api/stock/${sym}`); }
+    fetchFundamentals(sym)    { return this._get(`/api/fmp/${sym}`); }
+    fetchNews(sym)            { return this._get(`/api/news/${sym}`); }
+    fetchWatchlist()          { return this._get('/api/watchlist'); }
+    fetchSignals()            { return this._get('/api/signals'); }
+    fetchOmniBundle(sym)      { return this._get(`/api/omni/${sym}`); }
+    search(q)                 { return this._get(`/api/search?q=${encodeURIComponent(q)}`); }
+    chat(sym, msg)            { return this._post('/api/chat',{symbol:sym,message:msg}); }
+    
+    // God-Mode Endpoints
+    omniMultiAgentAnalyze(sym, model) { return this._post('/api/omni/multi-agent',{symbol:sym,model}); }
+    runScreener(universe, pe, rsi)    { return this._post('/api/screener',{universe, filters:{pe_max:pe, rsi_min:rsi}}); }
+    analyzePortfolio(positions)       { return this._post('/api/portfolio/analyze',{positions}); }
+
+    modifyWatchlist(action, sym, name='') {
+        const opt = {method:action==='ADD'?'POST':'DELETE',headers:{'Content-Type':'application/json'}};
+        if(action==='ADD') opt.body = JSON.stringify({symbol:sym,name});
+        return fetch(action==='ADD'?'/api/watchlist':`/api/watchlist/${sym}`,opt);
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 2. CHART CONTROLLER
+// ────────────────────────────────────────────────────────────────────────────
+class ChartController {
+    constructor(id) {
+        this.container = document.getElementById(id);
+        this.chart = null; this.series = null; 
+        this.overlays = {}; this.overlayData = null;
+        this._init();
+    }
+    _init() {
+        const dark = document.documentElement.classList.contains('dark');
+        this.chart = LightweightCharts.createChart(this.container, {
+            layout: {background:{type:'solid',color:'transparent'},textColor:dark?'#9CA3AF':'#6B7280'},
+            grid: {vertLines:{visible:false},horzLines:{color:dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)'}},
+            crosshair: {mode:LightweightCharts.CrosshairMode.Normal},
+            rightPriceScale:{borderVisible:false}, timeScale:{borderVisible:false,timeVisible:true},
+        });
+        new ResizeObserver(e=>{ if(e[0].contentRect.width>0) this.chart.resize(e[0].contentRect.width,e[0].contentRect.height); }).observe(this.container);
+    }
+    updateTheme(dark) {
+        this.chart.applyOptions({layout:{textColor:dark?'#9CA3AF':'#6B7280'},grid:{horzLines:{color:dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)'}}});
+    }
+    draw(data) {
+        if(this.series) this.chart.removeSeries(this.series);
+        this._clearOverlays();
+        if(!data||!data.length) return;
+        const isPos = (data[data.length-1].value||0) >= (data[0].value||0);
+        this.series = this.chart.addAreaSeries({
+            lineColor: isPos?'#22C55E':'#EF4444',
+            topColor:  isPos?'rgba(34,197,94,0.4)':'rgba(239,68,68,0.4)',
+            bottomColor:isPos?'rgba(34,197,94,0.0)':'rgba(239,68,68,0.0)',
+            lineWidth:2, priceLineVisible:true,
+        });
+        this.series.setData(data.map(d=>({time:d.time,value:d.value||d.close})));
+        this.chart.timeScale().fitContent();
+    }
+    setOverlayData(data) { this.overlayData = data; }
+    _clearOverlays() {
+        for(let key in this.overlays) { this.chart.removeSeries(this.overlays[key]); delete this.overlays[key]; }
+    }
+    toggleOverlay(type) {
+        if(!this.overlayData) return;
+        if(type === 'sma') {
+            if(this.overlays['sma20']) {
+                this.chart.removeSeries(this.overlays['sma20']); delete this.overlays['sma20'];
+                this.chart.removeSeries(this.overlays['sma50']); delete this.overlays['sma50'];
+                document.getElementById('btn-ov-sma').classList.remove('bg-blue-500/20','text-blue-500','border-blue-500/50');
+            } else {
+                const s20 = this.chart.addLineSeries({color:'#3b82f6', lineWidth:2});
+                const s50 = this.chart.addLineSeries({color:'#f97316', lineWidth:2});
+                s20.setData(this.overlayData.map(d=>({time:d.time, value:d.sma_20})).filter(d=>d.value));
+                s50.setData(this.overlayData.map(d=>({time:d.time, value:d.sma_50})).filter(d=>d.value));
+                this.overlays['sma20'] = s20; this.overlays['sma50'] = s50;
+                document.getElementById('btn-ov-sma').classList.add('bg-blue-500/20','text-blue-500','border-blue-500/50');
+            }
+        }
+        if(type === 'bb') {
+            if(this.overlays['bbu']) {
+                this.chart.removeSeries(this.overlays['bbu']); delete this.overlays['bbu'];
+                this.chart.removeSeries(this.overlays['bbl']); delete this.overlays['bbl'];
+                document.getElementById('btn-ov-bb').classList.remove('bg-blue-500/20','text-blue-500','border-blue-500/50');
+            } else {
+                const bbu = this.chart.addLineSeries({color:'rgba(156, 163, 175, 0.5)', lineWidth:1, lineStyle: 2});
+                const bbl = this.chart.addLineSeries({color:'rgba(156, 163, 175, 0.5)', lineWidth:1, lineStyle: 2});
+                bbu.setData(this.overlayData.map(d=>({time:d.time, value:d.bb_upper})).filter(d=>d.value));
+                bbl.setData(this.overlayData.map(d=>({time:d.time, value:d.bb_lower})).filter(d=>d.value));
+                this.overlays['bbu'] = bbu; this.overlays['bbl'] = bbl;
+                document.getElementById('btn-ov-bb').classList.add('bg-blue-500/20','text-blue-500','border-blue-500/50');
+            }
+        }
+    }
+    showLoading(v) { document.getElementById('chart-loading').style.display = v?'flex':'none'; }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 3. OMNI DATA CONTROLLER – rendert das Dashboard
+// ────────────────────────────────────────────────────────────────────────────
+class OmniController {
+    constructor(api) { this.api = api; this.bundle = null; }
+
+    async load(symbol) {
+        this._status('loading','Lade Omni-Data...');
+        try {
+            this.bundle = await this.api.fetchOmniBundle(symbol);
+            this._render(this.bundle);
+            this._status('ok',`${symbol} · ${this.bundle.timestamp||''}`);
+        } catch(e) {
+            this._status('error','Fehler beim Laden');
+            console.error('[Omni]',e);
+        }
+    }
+
+    _status(state, text) {
+        const dot = document.getElementById('omni-status-dot');
+        const txt = document.getElementById('omni-status-text');
+        dot.className = `w-2 h-2 rounded-full inline-block ${{loading:'bg-yellow-400 animate-pulse',ok:'bg-green-500',error:'bg-red-500'}[state]||'bg-gray-400'}`;
+        txt.textContent = text;
+    }
+
+    _render(b) {
+        this._reddit(b.reddit||{});
+        this._fearGreed(b.fear_greed||{}, b.macro||{});
+        this._trends(b.trends||{});
+        this._earnings(b.earnings||{});
+        this._analyst(b.analyst||{}, b.price_target||{});
+        this._newsSentiment(b.news_sentiment||{});
+        this._insider(b.insider||{}, b.filings||[]);
+    }
+
+    _reddit(r) {
+        const sentScore = r.sentiment||0;
+        const labelEl   = document.getElementById('reddit-label');
+        if(labelEl) {
+            labelEl.textContent = r.sentiment_label||'N/A';
+            labelEl.className   = `text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                sentScore>0.1  ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400' :
+                sentScore<-0.1 ? 'bg-red-100 dark:bg-red-500/20 text-red-500' :
+                                 'bg-gray-100 dark:bg-white/10 text-gray-500'}`;
+        }
+        const b = document.getElementById('reddit-bullish');
+        const e = document.getElementById('reddit-bearish');
+        if(b) b.textContent = `${r.bullish_pct||0}%`;
+        if(e) e.textContent = `${r.bearish_pct||0}%`;
+        const bd = document.getElementById('reddit-breakdown');
+        if(bd) {
+            const breakdown = r.subreddit_breakdown||{};
+            bd.innerHTML = Object.entries(breakdown).filter(([,v])=>v>0)
+                .map(([k,v])=>`<div class="flex justify-between"><span>r/${k}</span><span class="font-bold">${v} posts</span></div>`)
+                .join('') || '<span class="text-gray-400">Keine Daten</span>';
+        }
+    }
+
+    _fearGreed(fg, macro) {
+        const val   = fg.value||0;
+        const color = val<25?'#EF4444':val<45?'#F97316':val<55?'#EAB308':val<75?'#22C55E':'#10B981';
+        const arc   = document.getElementById('fg-arc');
+        if(arc) { arc.setAttribute('stroke',color); arc.setAttribute('stroke-dasharray',`${val} ${100-val}`); }
+        const fv = document.getElementById('fg-value'); if(fv) fv.textContent = val||'—';
+        const fe = document.getElementById('fg-emoji'); if(fe) fe.textContent = fg.emoji||'❓';
+        const fl = document.getElementById('fg-label');
+        if(fl) { fl.textContent = fg.label||'Fear & Greed'; fl.style.color = color; }
+        const mm = document.getElementById('macro-mini');
+        if(mm) mm.innerHTML = Object.entries(macro).slice(0,3).map(([k,v])=>`
+            <div class="text-center p-1 bg-gray-50 dark:bg-white/5 rounded-lg">
+                <div class="text-[9px] text-gray-400 uppercase">${k}</div>
+                <div class="text-xs font-bold ${(v.change_pct||0)>=0?'text-green-500':'text-red-500'}">${v.value||'?'}</div>
+                <div class="text-[8px] text-gray-400">${(v.change_pct||0)>=0?'+':''}${(v.change_pct||0).toFixed(1)}%</div>
+            </div>`).join('');
+    }
+
+    _trends(t) {
+        const els = {
+            'trends-current': t.current_interest??'—',
+            'trends-peak':    t.peak_interest??'—',
+            'trends-avg':     t.avg_interest??'—',
+            'trends-direction': t.trend_direction||'—',
+        };
+        for(const [id,val] of Object.entries(els)) { const el=document.getElementById(id); if(el) el.textContent=val; }
+        const spark = document.getElementById('trends-sparkline');
+        if(spark) {
+            const iot = t.interest_over_time||[];
+            if(iot.length>0) {
+                const max  = Math.max(...iot.map(d=>d.value),1);
+                const step = Math.max(Math.floor(iot.length/28),1);
+                const sample = iot.filter((_,i)=>i%step===0).slice(-28);
+                spark.innerHTML = sample.map(d=>{
+                    const h   = Math.max(Math.round((d.value/max)*100),4);
+                    const col = d.value>=(t.avg_interest||0)?'#3b82f6':'rgba(156,163,175,0.35)';
+                    return `<div style="height:${h}%;background:${col};flex:1;border-radius:2px" title="${d.date}: ${d.value}"></div>`;
+                }).join('');
+            } else {
+                spark.innerHTML = '<span class="text-xs text-gray-400">Keine Daten</span>';
+            }
+        }
+    }
+
+    _earnings(e) {
+        const el = document.getElementById('earnings-card');
+        if(!el) return;
+        const surp = parseFloat(e.surprise_pct||0);
+        el.innerHTML = `
+            <div class="flex justify-between"><span class="text-gray-500">Nächste Earnings</span><span class="font-bold dark:text-white">${e.next_date||'N/A'}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Quartal</span><span class="font-bold dark:text-white">${e.quarter||'N/A'}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">EPS Schätzung</span><span class="font-bold dark:text-white">${e.estimate||'N/A'}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">EPS Actual</span><span class="font-bold dark:text-white">${e.actual||'N/A'}</span></div>
+            ${e.surprise_pct&&e.surprise_pct!=='N/A'?`<div class="flex justify-between mt-1 pt-1 border-t border-gray-100 dark:border-white/5">
+                <span class="text-gray-500">Surprise</span>
+                <span class="font-bold ${surp>=0?'text-green-500':'text-red-500'}">${surp>=0?'+':''}${surp}%</span></div>`:''}`;
+    }
+
+    _analyst(a, target) {
+        const el = document.getElementById('analyst-card');
+        if(!el) return;
+        const total   = (a.buy||0)+(a.hold||0)+(a.sell||0);
+        const buyPct  = total>0?Math.round(a.buy/total*100):0;
+        const holdPct = total>0?Math.round(a.hold/total*100):0;
+        const sellPct = total>0?100-buyPct-holdPct:0;
+        const recClr  = {'BUY':'text-green-500','STRONG_BUY':'text-green-500','HOLD':'text-yellow-500','SELL':'text-red-500'}[a.recommendation]||'text-gray-400';
+        el.innerHTML = `
+            <div class="text-center mb-2"><span class="text-base font-black ${recClr}">${a.recommendation||'N/A'}</span></div>
+            <div class="flex gap-0.5 h-2 rounded-full overflow-hidden mb-1">
+                <div style="width:${buyPct}%" class="bg-green-500"></div>
+                <div style="width:${holdPct}%" class="bg-yellow-400"></div>
+                <div style="width:${sellPct}%" class="bg-red-500"></div>
+            </div>
+            <div class="flex justify-between text-[10px] mb-2">
+                <span class="text-green-500 font-bold">BUY ${a.buy||0}</span>
+                <span class="text-yellow-500 font-bold">HOLD ${a.hold||0}</span>
+                <span class="text-red-500 font-bold">SELL ${a.sell||0}</span>
+            </div>
+            ${a.avg_target?`<div class="flex justify-between"><span class="text-gray-500">Ø Kursziel</span><span class="font-bold dark:text-white">$${a.avg_target}</span></div>`:''}
+            ${target.avg_target&&target.avg_target!=='N/A'?`<div class="flex justify-between"><span class="text-gray-500">Range</span><span class="font-bold text-blue-500">$${target.low_target}–$${target.high_target}</span></div>`:''}`;
+    }
+
+    _newsSentiment(ns) {
+        const el = document.getElementById('news-sentiment-card');
+        if(!el) return;
+        const score = ns.score||0;
+        const clr   = score>0.1?'text-green-500':score<-0.1?'text-red-500':'text-yellow-500';
+        const barW  = Math.round(((score+1)/2)*100);
+        el.innerHTML = `
+            <div class="text-center mb-2"><span class="text-base font-black ${clr}">${ns.label||'N/A'}</span></div>
+            <div class="relative h-2 bg-gray-200 dark:bg-white/10 rounded-full mb-2">
+                <div class="absolute left-0 top-0 h-full rounded-full ${score>=0?'bg-green-500':'bg-red-500'}" style="width:${barW}%"></div>
+            </div>
+            <div class="flex justify-between text-[10px] mb-1">
+                <span class="text-gray-400">Bear ${ns.bearish_pct||0}%</span>
+                <span class="text-gray-400">Bull ${ns.bullish_pct||0}%</span>
+            </div>
+            <div class="flex justify-between"><span class="text-gray-500">Artikel (7d)</span><span class="font-bold dark:text-white">${ns.buzz||0}</span></div>`;
+    }
+
+    _insider(ins, filings) {
+        const el = document.getElementById('insider-card');
+        if(!el) return;
+        el.innerHTML = `
+            <div class="flex justify-between"><span class="text-gray-500">CIK</span><span class="font-mono text-[10px] dark:text-white">${ins.cik||'N/A'}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Form-4 Filings</span><span class="font-bold dark:text-white">${ins.form4_count_recent||0}x</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Letztes Filing</span><span class="font-bold dark:text-white text-[10px]">${ins.last_filing||'N/A'}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Aktivität</span><span class="font-bold ${ins.signal==='Aktiv'?'text-amber-500':'text-gray-400'}">${ins.signal||'N/A'}</span></div>
+            ${(filings||[]).slice(0,3).map(f=>`
+                <div class="flex justify-between items-center mt-1 pt-1 border-t border-gray-100 dark:border-white/5 text-[9px]">
+                    <span class="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1 rounded font-bold">${f.form}</span>
+                    <span class="text-gray-400">${f.date}</span>
+                    <a href="${f.url}" target="_blank" class="text-blue-400 hover:underline">↗</a>
+                </div>`).join('')}`;
+    }
+
+    openRawPanel() {
+        if(!app.state.symbol) return alert("Wähle eine Aktie aus!");
+        app.ui.openModal('raw-panel-modal');
+        const pre = document.getElementById('omni-raw-json');
+        if(this.bundle && this.bundle.ticker === app.state.symbol) {
+            pre.textContent = JSON.stringify(this.bundle, null, 2);
+        } else {
+            pre.textContent = 'Lade...';
+            this.api.fetchOmniBundle(app.state.symbol).then(b => {
+                this.bundle = b;
+                pre.textContent = JSON.stringify(b, null, 2);
+            });
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 4. APPLICATION ORCHESTRATOR
+// ────────────────────────────────────────────────────────────────────────────
+class Application {
+    constructor() {
+        this.api     = new DataService();
+        this.chartUI = new ChartController('chart-container');
+        this.omni    = new OmniController(this.api);
+        this.state   = { symbol: null, name: null, period: '1y', lastFetch: 0 };
+        this.positions = [];
+
+        this.ui = {
+            openModal: (id) => {
+                const m = document.getElementById(id); m.classList.remove('hidden'); m.classList.add('flex');
+                setTimeout(() => { m.classList.remove('opacity-0'); m.querySelector('.modal-inner')?.classList.remove('scale-95'); }, 10);
+            },
+            closeModal: (id) => {
+                const m = document.getElementById(id); m.classList.add('opacity-0'); m.querySelector('.modal-inner')?.classList.add('scale-95');
+                setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+            },
+        };
+
+        this.reports = {
+            openModal: () => {
+                if(!this.state.symbol) return alert('Wähle eine Aktie aus!');
+                document.getElementById('report-symbol-title').innerText = `Target: ${this.state.symbol} | Protocol: Multi-Agent Omni`;
+                document.getElementById('report-result').classList.add('hidden');
+                document.getElementById('report-controls').classList.remove('hidden');
+                this.ui.openModal('report-modal');
+            },
+            closeModal: () => this.ui.closeModal('report-modal'),
+            generate: async () => {
+                document.getElementById('report-controls').classList.add('hidden');
+                const rl = document.getElementById('report-loading');
+                rl.classList.remove('hidden'); rl.classList.add('flex');
+                
+                // Fancy Animation für die Agenten
+                const agents = ['fund', 'tech', 'sent'];
+                agents.forEach((a, i) => {
+                    setTimeout(() => {
+                        document.getElementById(`agent-${a}-loader`).style.width = '100%';
+                        document.getElementById(`agent-${a}-status`).innerText = 'Report generiert ✓';
+                        document.getElementById(`agent-${a}-status`).classList.add('text-green-500');
+                    }, 1000 + (i*800));
+                });
+                setTimeout(() => document.getElementById('chief-agent-box').classList.remove('opacity-50'), 3500);
+
+                try {
+                    const model = document.getElementById('report-model-select').value;
+                    const data = await this.api.omniMultiAgentAnalyze(this.state.symbol, model);
+                    
+                    rl.classList.add('hidden'); rl.classList.remove('flex');
+                    const resultEl = document.getElementById('report-result');
+                    resultEl.innerHTML = marked.parse(data.report||'Kein Ergebnis.');
+                    resultEl.classList.remove('hidden');
+                    
+                    // Reset Animations
+                    agents.forEach(a => {
+                        document.getElementById(`agent-${a}-loader`).style.width = '0%';
+                        document.getElementById(`agent-${a}-status`).innerText = 'Warte...';
+                        document.getElementById(`agent-${a}-status`).classList.remove('text-green-500');
+                    });
+                } catch(e) {
+                    rl.innerHTML = `<p class="text-red-500 font-bold">System Error: ${e.message}</p>`;
+                }
+            }
+        };
+
+        this.portfolio = {
+            addPosition: () => {
+                const sym = document.getElementById('port-ticker').value.toUpperCase();
+                const qty = parseFloat(document.getElementById('port-qty').value);
+                if(!sym || !qty) return;
+                this.positions.push({ticker: sym, qty: qty, buy_price: 100}); // Buy price mock für UI simplify
+                this.portfolio.renderList();
+                document.getElementById('port-ticker').value = ''; document.getElementById('port-qty').value = '';
+            },
+            removePosition: (idx) => { this.positions.splice(idx,1); this.portfolio.renderList(); },
+            renderList: () => {
+                document.getElementById('portfolio-positions-body').innerHTML = this.positions.map((p,i) => `
+                    <tr class="border-b border-gray-100 dark:border-white/5"><td class="py-2 font-bold">${p.ticker}</td><td>${p.qty}</td>
+                    <td><button onclick="app.portfolio.removePosition(${i})" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="w-4 h-4"></i></button></td></tr>`).join('');
+                lucide.createIcons();
+            },
+            addMockPosition: () => {
+                this.positions = [{ticker:"AAPL",qty:10,buy_price:150},{ticker:"MSFT",qty:5,buy_price:300},{ticker:"NVDA",qty:20,buy_price:400}];
+                this.portfolio.renderList();
+                this.portfolio.analyze();
+            },
+            analyze: async () => {
+                if(!this.positions.length) return alert('Füge zuerst Positionen hinzu.');
+                try {
+                    const res = await this.api.analyzePortfolio(this.positions);
+                    if(!res.metrics) return alert('Konnte Portfolio nicht analysieren.');
+                    const m = res.metrics;
+                    document.getElementById('portfolio-stats').innerHTML = `
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Total Return</div>
+                            <div class="text-xl font-black ${m.total_return>=0?'text-green-500':'text-red-500'}">${(m.total_return*100).toFixed(2)}%</div></div>
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Sharpe Ratio</div>
+                            <div class="text-xl font-black text-blue-500">${m.sharpe_ratio.toFixed(2)}</div></div>
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Max Drawdown</div>
+                            <div class="text-xl font-black text-red-500">${(m.max_drawdown*100).toFixed(2)}%</div></div>
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Value at Risk (95%)</div>
+                            <div class="text-xl font-black text-orange-500">${(m.var_95*100).toFixed(2)}%</div></div>
+                        <div class="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10">
+                            <div class="text-[10px] text-gray-500 uppercase font-bold">Alpha vs S&P500</div>
+                            <div class="text-xl font-black ${res.benchmark.alpha>=0?'text-green-500':'text-red-500'}">${(res.benchmark.alpha*100).toFixed(2)}%</div></div>`;
+                    
+                    document.getElementById('portfolio-sectors').innerHTML = res.sector_alloc.map(s => `
+                        <div>
+                            <div class="flex justify-between text-xs font-bold mb-1"><span>${s.sector}</span><span>${(s.weight*100).toFixed(1)}%</span></div>
+                            <div class="w-full bg-gray-200 dark:bg-white/10 rounded-full h-2"><div class="bg-purple-500 h-2 rounded-full" style="width: ${s.weight*100}%"></div></div>
+                        </div>`).join('');
+                } catch(e) { alert('Fehler bei der Analyse.'); }
+            }
+        };
+
+        this._initUI();
+        this._renderTimeframes();
+        this._setupSearch();
+        this._setupChat();
+        setInterval(() => this._updateStatus(), 10000);
+        this.loadWatchlist();
+        this._loadGlobalSignals();
+    }
+
+    async _loadGlobalSignals() {
+        try {
+            const data = await this.api.fetchSignals();
+            if(data.fear_greed) this.omni._fearGreed(data.fear_greed, data.macro||{});
+        } catch(e) {}
+    }
+
+    _initUI() {
+        lucide.createIcons();
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const dark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', dark?'dark':'light');
+            this.chartUI.updateTheme(dark); lucide.createIcons();
+        });
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const tab = e.currentTarget.getAttribute('data-tab');
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`tab-${tab}`).classList.remove('hidden');
+                document.querySelectorAll('.nav-btn').forEach(el => { el.className = 'nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors'; });
+                e.currentTarget.className = 'nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-black dark:text-white font-semibold transition-colors';
+            });
+        });
+    }
+
+    _renderTimeframes() {
+        const tf = ['1d','5d','1mo','6mo','1y','5y','max'];
+        document.getElementById('timeframe-controls').innerHTML = tf.map(t =>
+            `<button onclick="app.setPeriod('${t}')" id="btn-tf-${t}" class="tf-btn px-2 py-1 rounded text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5 transition-all ${t==='1y'?'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm':''}">${t.toUpperCase()}</button>`
+        ).join('');
+    }
+
+    async setPeriod(p) {
+        this.state.period = p;
+        document.querySelectorAll('.tf-btn').forEach(b => b.className = 'tf-btn px-2 py-1 rounded text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5 transition-all');
+        const btn = document.getElementById(`btn-tf-${p}`);
+        if(btn) btn.className = 'tf-btn px-2 py-1 rounded text-xs font-medium bg-white dark:bg-white/10 text-black dark:text-white shadow-sm';
+        if(this.state.symbol) await this._loadChart();
+    }
+
+    _updateStatus() {
+        if(!this.state.lastFetch) return;
+        const live = ((Date.now()-this.state.lastFetch)/60000) < 5;
+        document.getElementById('status-dot').className   = `inline-flex rounded-full h-2 w-2 ${live?'bg-green-500 animate-pulse shadow-[0_0_4px_rgba(34,197,94,0.8)]':'bg-red-500'}`;
+        document.getElementById('status-text').innerText  = live ? 'System Online' : 'Verzögert';
+    }
+
+    async _loadChart() {
+        this.chartUI.showLoading(true);
+        const data = await this.api.fetchChart(this.state.symbol, this.state.period);
+        this.chartUI.draw(data);
+        
+        // Fetch Technical Overlays
+        try {
+            const techData = await this.api.fetchTechnical(this.state.symbol);
+            if(techData.chart_data) {
+                this.chartUI.setOverlayData(techData.chart_data);
+                // Update Badge
+                if(techData.analysis && techData.analysis.score !== undefined) {
+                    const badge = document.getElementById('tech-signal-badge');
+                    const sc = techData.analysis.score;
+                    badge.classList.remove('hidden','bg-blue-500/20','text-blue-500','border-blue-500/30','bg-green-500/20','text-green-500','border-green-500/30','bg-red-500/20','text-red-500','border-red-500/30');
+                    if(sc > 20)      badge.classList.add('bg-green-500/20','text-green-500','border-green-500/30');
+                    else if(sc < -20) badge.classList.add('bg-red-500/20','text-red-500','border-red-500/30');
+                    else             badge.classList.add('bg-gray-500/20','text-gray-500','border-gray-500/30');
+                    badge.innerText = `Tech Score: ${sc}`;
+                }
+            }
+        } catch(e) { console.warn("No technical data", e); }
+        
+        this.chartUI.showLoading(false);
+        this.state.lastFetch = Date.now();
+        this._updateStatus();
+    }
+
+    async loadAsset(symbol, name) {
+        this.state.symbol = symbol; this.state.name = name||symbol;
+        document.getElementById('main-chart-symbol').innerText = symbol;
+        document.getElementById('main-chart-name').innerText   = name;
+        document.getElementById('tech-signal-badge').classList.add('hidden'); // Reset badge
+
+        // Reset Overlays buttons
+        ['sma','bb'].forEach(k => {
+            const btn = document.getElementById('btn-ov-'+k);
+            if(btn) btn.classList.remove('bg-blue-500/20','text-blue-500','border-blue-500/50');
+        });
+
+        // Reset Omni cards
+        ['earnings-card','analyst-card','news-sentiment-card','insider-card'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.innerHTML = '<div class="text-gray-400">Lade...</div>';
+        });
+
+        await this._loadChart();
+
+        const stock = await this.api.fetchStockSummary(symbol);
+        document.getElementById('data-source-badge').innerText = `Quelle: ${stock.source||'Finnhub/Yahoo'}`;
+
+        const fmp = await this.api.fetchFundamentals(symbol);
+        const fmt = n => isNaN(parseFloat(n)) ? 'N/A' : new Intl.NumberFormat('de-DE',{notation:'compact'}).format(parseFloat(n));
+        document.getElementById('stats-grid').innerHTML = [
+            {label:'Market Cap', val: fmp.marketCap!=='N/A'?'$'+fmt(fmp.marketCap):'N/A'},
+            {label:'Umsatz',     val: fmp.revenue!=='N/A'?'$'+fmt(fmp.revenue):'N/A'},
+            {label:'Net Income', val: fmp.netIncome!=='N/A'?'$'+fmt(fmp.netIncome):'N/A'},
+            {label:'KGV (P/E)',  val: fmp.peRatio!=='N/A'?parseFloat(fmp.peRatio).toFixed(2):'N/A'},
+            {label:'EPS',        val: fmp.eps!=='N/A'?'$'+parseFloat(fmp.eps).toFixed(2):'N/A'},
+            {label:'Debt/Eq',    val: fmp.debtToEquity!=='N/A'?parseFloat(fmp.debtToEquity).toFixed(2):'N/A'},
+            {label:'Empfehlung', val: stock.recommendation||'N/A'},
+            {label:'Quelle',     val: fmp.source||'N/A'},
+        ].map(s => `<div class="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5 p-3 rounded-xl text-center">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">${s.label}</div>
+            <div class="text-sm font-bold text-gray-900 dark:text-white">${s.val}</div></div>`).join('');
+
+        // News Banner
+        const news = await this.api.fetchNews(symbol);
+        document.getElementById('news-banner').innerHTML = news.length
+            ? news.map(n=>`<a href="${n.url}" target="_blank" class="hover:text-blue-400"><b>${n.source}:</b> ${n.headline}</a>`).join('<span class="mx-3 text-blue-500">•</span>')
+            : 'Keine aktuellen News.';
+
+        // Lade das Omni Dashboard (Reddit, Fear&Greed etc)
+        this.omni.load(symbol);
+    }
+
+    async runScreener() {
+        const uni = document.getElementById('screen-universe').value;
+        const pe  = document.getElementById('screen-pe').value || null;
+        const rsi = document.getElementById('screen-rsi').value || null;
+        
+        document.getElementById('screener-loading').classList.remove('hidden');
+        document.getElementById('screener-loading').classList.add('flex');
+        
+        try {
+            const res = await this.api.runScreener(uni, pe, rsi);
+            const tb = document.getElementById('screener-results');
+            tb.innerHTML = res.map(r => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <td class="px-6 py-4 font-bold text-blue-500">${r.Ticker}</td>
+                    <td class="px-6 py-4 font-mono">$${r.Price.toFixed(2)}</td>
+                    <td class="px-6 py-4 font-bold ${r['Change %']>=0?'text-green-500':'text-red-500'}">${r['Change %']>=0?'+':''}${r['Change %'].toFixed(2)}%</td>
+                    <td class="px-6 py-4">${r['P/E Ratio'] !== null ? r['P/E Ratio'].toFixed(1) : 'N/A'}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs font-bold ${r.Score>60?'bg-green-500/20 text-green-500':r.Score<40?'bg-red-500/20 text-red-500':'bg-gray-500/20 text-gray-500'}">${r.Score.toFixed(0)}</span></td>
+                    <td class="px-6 py-4 text-right">
+                        <button onclick="app.addWatchlist('${r.Ticker}','${r.Ticker}')" class="text-xs bg-gray-200 dark:bg-white/10 hover:bg-blue-500 hover:text-white px-3 py-1.5 rounded transition-colors font-bold">Laden</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch(e) { alert("Screener Fehler"); }
+        document.getElementById('screener-loading').classList.add('hidden');
+        document.getElementById('screener-loading').classList.remove('flex');
+    }
+
+    _setupSearch() {
+        const input  = document.getElementById('search-input');
+        const resBox = document.getElementById('search-dropdown');
+        let timeout;
+        input.addEventListener('input', e => {
+            clearTimeout(timeout);
+            const q = e.target.value.trim();
+            if(q.length < 2) { resBox.classList.add('hidden'); return; }
+            timeout = setTimeout(async () => {
+                const results = await this.api.search(q);
+                resBox.innerHTML = results.length
+                    ? results.map(r=>`<div onclick="app.addWatchlist('${r.symbol}','${r.name}')" class="p-3 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer flex justify-between items-center border-b border-gray-100 dark:border-white/5 last:border-0">
+                        <div><div class="font-bold text-sm dark:text-white">${r.symbol}</div><div class="text-[10px] text-gray-500">${r.name}</div></div>
+                        <div class="text-[9px] border border-gray-200 dark:border-white/10 px-2 py-1 rounded text-gray-500 uppercase">${r.type}</div>
+                      </div>`).join('')
+                    : '<div class="p-3 text-sm text-gray-500">Nichts gefunden.</div>';
+                resBox.classList.remove('hidden');
+            }, 400);
+        });
+        document.addEventListener('click', e => { if(!input.contains(e.target) && !resBox.contains(e.target)) resBox.classList.add('hidden'); });
+    }
+
+    async addWatchlist(symbol, name) {
+        await this.api.modifyWatchlist('ADD', symbol, name);
+        document.getElementById('search-input').value = '';
+        document.getElementById('search-dropdown').classList.add('hidden');
+        document.querySelectorAll('.nav-btn')[0].click(); // Switch to terminal
+        await this.loadWatchlist();
+        this.loadAsset(symbol, name);
+    }
+
+    async removeWatchlist(symbol, e) {
+        e.stopPropagation();
+        await this.api.modifyWatchlist('REMOVE', symbol);
+        this.loadWatchlist();
+    }
+
+    async loadWatchlist() {
+        const data = await this.api.fetchWatchlist();
+        const cont = document.getElementById('watchlist-container');
+        cont.innerHTML = data.length === 0 ? '<span class="text-xs text-gray-500">Keine Aktien.</span>' : data.map(item => `
+            <div onclick="app.loadAsset('${item.symbol}','${item.name}')" class="group relative flex items-baseline space-x-2 cursor-pointer bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 hover:border-blue-500 px-3 py-2 rounded-xl transition-all shadow-sm">
+                <span class="font-bold text-sm">${item.symbol}</span>
+                <span class="text-[10px] font-bold ${item.isPositive?'text-green-500':'text-red-500'}">${item.change}</span>
+                <button onclick="app.removeWatchlist('${item.symbol}',event)" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <i data-lucide="x" class="w-3 h-3"></i></button>
+            </div>`).join('');
+        lucide.createIcons();
+        if(data.length > 0 && !this.state.symbol) this.loadAsset(data[0].symbol, data[0].name);
+    }
+
+    _setupChat() {
+        document.getElementById('chat-input').addEventListener('keypress', async e => {
+            if(e.key!=='Enter'||!this.state.symbol||!e.target.value.trim()) return;
+            const msg = e.target.value.trim(); e.target.value = '';
+            const out = document.getElementById('chat-output');
+            out.innerHTML += `<div class="flex mt-3 justify-end"><div class="bg-purple-600 text-white text-xs px-4 py-3 rounded-2xl rounded-tr-none max-w-[85%]">${msg}</div></div>`;
+            out.scrollTop = out.scrollHeight;
+            const id = 'l-'+Date.now();
+            out.innerHTML += `<div id="${id}" class="flex mt-3 justify-start"><div class="bg-gray-100 dark:bg-white/5 px-4 py-2 rounded-2xl rounded-tl-none border dark:border-white/10"><i data-lucide="loader" class="w-4 h-4 animate-spin text-purple-500"></i></div></div>`;
+            lucide.createIcons(); out.scrollTop = out.scrollHeight;
+            
+            try {
+                const res = await this.api.chat(this.state.symbol, msg);
+                document.getElementById(id).remove();
+                out.innerHTML += `<div class="flex mt-3 justify-start"><div class="bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-gray-200 text-xs px-4 py-3 rounded-2xl rounded-tl-none max-w-[95%] border dark:border-white/10 prose dark:prose-invert">${marked.parse(res.reply)}</div></div>`;
+            } catch(err) { document.getElementById(id).remove(); }
+            out.scrollTop = out.scrollHeight;
+        });
+    }
+    toggleOverlay(type) { this.chartUI.toggleOverlay(type); }
+}
+
+document.addEventListener('DOMContentLoaded', () => { requestAnimationFrame(() => { window.app = new Application(); }); });
+</script>
+</body>
+</html>
